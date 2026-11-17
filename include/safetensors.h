@@ -15,8 +15,9 @@
  *   [8+N .. EOF)      : contiguous raw tensor data
  *
  * This module loads the whole file into memory, parses the JSON header
- * with a small hand-rolled parser (no third-party dependencies), and
- * exposes a flat metadata table with direct pointers into the data.
+ * with the small standalone parser in json.h/json.c (no third-party
+ * dependencies), and exposes a flat metadata table with direct pointers
+ * into the data.
  *
  * Design note: the entire file is read with malloc + fread. Memory-mapped
  * loading (CreateFileMapping / mmap) is a possible later optimization; the
@@ -75,7 +76,8 @@ typedef struct {
 /*
  * Load a safetensors file. Reads the whole file, parses the header and
  * builds the tensor table. On failure, prints a diagnostic to stderr and
- * returns NULL (partial state is cleaned up).
+ * returns NULL (partial state is cleaned up). On success the parsed
+ * header is also written to ./header.json for inspection.
  */
 st_file_t *st_load(const char *path);
 

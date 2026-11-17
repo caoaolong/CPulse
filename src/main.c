@@ -132,6 +132,17 @@ static void print_tensor_map(const st_file_t *f, int full_list) {
     }
 }
 
+/* VS Code cppdbg on Windows appends "2>CON 1>CON <CON" to the debuggee
+ * command line when externalConsole is false (MIEngine console
+ * redirection, see avoidWindowsConsoleRedirection in launch.json).
+ * Those tokens are meant for cmd.exe but arrive as literal argv entries,
+ * so ignore them to keep F5 debugging working out of the box. */
+static int is_console_redir_token(const char *arg) {
+    return strcmp(arg, "2>CON") == 0 ||
+           strcmp(arg, "1>CON") == 0 ||
+           strcmp(arg, "<CON") == 0;
+}
+
 static void print_usage(const char *prog) {
     printf("Usage: %s [--model <model_dir>] [--list]\n", prog);
     printf("  --model <model_dir>   path to the model directory\n");
@@ -144,7 +155,9 @@ int main(int argc, char **argv) {
     int full_list = 0;
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
+        if (is_console_redir_token(argv[i])) {
+            continue;
+        } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
             model_dir = argv[++i];
         } else if (strcmp(argv[i], "--list") == 0) {
             full_list = 1;

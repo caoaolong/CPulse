@@ -1,2 +1,6 @@
 .cache
 build
+header.json
+
+playground/node_modules/
+playground/dist/

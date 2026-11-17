@@ -17,8 +17,16 @@
 .PARAMETER SkipExisting
     If set, reuse an already-downloaded model directory without re-cloning.
 
+.PARAMETER Proxy
+    HTTP(S) proxy for git + git-lfs, e.g. "http://127.0.0.1:7890".
+    If omitted, the script falls back to the HTTPS_PROXY / HTTP_PROXY
+    environment variables (either case). Empty = direct connection.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\download_model.ps1
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\download_model.ps1 -Proxy http://127.0.0.1:7890
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\download_model.ps1 -SkipExisting
@@ -27,7 +35,8 @@
 [CmdletBinding()]
 param(
     [string]$ModelRepo = "Qwen/Qwen2.5-0.5B",
-    [switch]$SkipExisting
+    [switch]$SkipExisting,
+    [string]$Proxy = ""
 )
 
 # ---------------------------------------------------------------------------
@@ -140,6 +149,25 @@ Write-Ok "Cache directory ready: $CacheDir"
 # ---------------------------------------------------------------------------
 # 5. Clone the model (shallow, with LFS)
 # ---------------------------------------------------------------------------
+# Proxy resolution: explicit -Proxy wins, otherwise pick up the standard
+# HTTPS_PROXY / HTTP_PROXY environment variables (either case), otherwise
+# connect directly. The proxy is passed via `git -c http.proxy=...` so it
+# applies to this clone only (global git config is left untouched) and is
+# inherited by the git-lfs smudge filter that downloads the weight files.
+if (-not $Proxy) {
+    $Proxy = $env:HTTPS_PROXY
+    if (-not $Proxy) { $Proxy = $env:HTTP_PROXY }
+    if (-not $Proxy) { $Proxy = $env:https_proxy }
+    if (-not $Proxy) { $Proxy = $env:http_proxy }
+}
+$gitProxyArgs = @()
+if ($Proxy) {
+    Write-Host "  Proxy: $Proxy" -ForegroundColor Cyan
+    $gitProxyArgs = @("-c", "http.proxy=$Proxy", "-c", "https.proxy=$Proxy")
+} else {
+    Write-Host "  Proxy: (none, direct connection)" -ForegroundColor DarkGray
+}
+
 $cloneUrl = "https://www.modelscope.cn/$ModelRepo.git"
 
 Write-Step "Cloning model from ModelScope (shallow clone)..."
@@ -151,7 +179,7 @@ Write-Host ""
 try {
     # --depth 1 : shallow clone (we only need the latest snapshot)
     # --no-tags : skip tags to save time
-    git clone --depth 1 --no-tags --progress $cloneUrl $ModelDir
+    git @gitProxyArgs clone --depth 1 --no-tags --progress $cloneUrl $ModelDir
 } catch {
     Write-Err "git clone failed: $_"
     exit 1
@@ -173,6 +201,7 @@ if (-not (Test-Path (Join-Path $ModelDir "config.json"))) {
 $weightFiles = Get-ChildItem -Path $ModelDir -Recurse -Include *.safetensors, *.bin -File -ErrorAction SilentlyContinue
 if (-not $weightFiles -or $weightFiles.Count -eq 0) {
     Write-Err "No weight files (.safetensors / .bin) found. git-lfs files may not have been fetched."
+    if ($Proxy) { Write-Warn "You cloned with a proxy; export it first: `$env:HTTPS_PROXY = `"$Proxy`"" }
     Write-Warn "Try running: git -C $ModelDir lfs pull"
     exit 1
 }
@@ -189,6 +218,7 @@ foreach ($wf in $weightFiles) {
 if ($pointerFiles.Count -gt 0) {
     Write-Err "Found $($pointerFiles.Count) LFS pointer file(s) instead of real weights:"
     foreach ($pf in $pointerFiles) { Write-Host "    - $($pf.FullName)" }
+    if ($Proxy) { Write-Warn "You cloned with a proxy; export it first: `$env:HTTPS_PROXY = `"$Proxy`"" }
     Write-Warn "Run: git -C $ModelDir lfs pull --force"
     exit 1
 }
