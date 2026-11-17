@@ -1,25 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import { EmbeddingScene, VOCAB_SIZE, HIDDEN_SIZE } from './three/embeddingScene';
+import { EmbeddingScene } from './three/embeddingScene';
+import { loadModelSpec, type SelInfo } from './three/modelMap';
 
 export default function App(): React.JSX.Element {
   const canvasRef: React.RefObject<HTMLCanvasElement | null> = useRef<HTMLCanvasElement | null>(null);
-  const [tokenId, setTokenId] = useState<number | null>(null);
+  const [sel, setSel] = useState<SelInfo | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-    const scene: EmbeddingScene = new EmbeddingScene(canvasRef.current, setTokenId);
-    return () => scene.dispose();
+    let cancelled = false;
+    let scene: EmbeddingScene | null = null;
+    loadModelSpec().then((s) => {
+      if (cancelled || !canvasRef.current) return;
+      scene = new EmbeddingScene(canvasRef.current, s, setSel);
+    });
+    return () => {
+      cancelled = true;
+      scene?.dispose();
+    };
   }, []);
 
   return (
     <>
       <canvas id="scene" ref={canvasRef} />
       <div id="hud">
-        <div><b>embed_tokens</b> <span className="dim">[{VOCAB_SIZE}, {HIDDEN_SIZE}]</span> BF16 · 约 272 MB</div>
-        <div>单个 Box 示意: 宽 {HIDDEN_SIZE} × 长 {VOCAB_SIZE}（游标 = 查表位置）</div>
-        <div>当前查表 token id ≈ <span id="token">{tokenId === null ? '-' : tokenId}</span></div>
+        <div>名称 <span id="token">{sel === null ? '-' : sel.title}</span></div>
+        <div>形状 <span className="dim">{sel === null ? '-' : sel.shape}</span></div>
+        <div>类型 <span className="dim">{sel === null ? '-' : sel.dtype}</span></div>
       </div>
-      <div id="help">左键旋转 · 右键平移 · 滚轮缩放</div>
     </>
   );
 }

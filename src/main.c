@@ -3,7 +3,7 @@
  *
  * Project : CPulse - minimal LLM inference engine written from scratch in C
  * Model   : Qwen2.5-0.5B (decoder-only Transformer)
- * Stage   : 2 - weight loading (safetensors parsing)
+ * Stage   : 3 - config loading (weight mapping comes next)
  *
  * What this stage does:
  *   - verify the model weights are present and discoverable
@@ -27,10 +27,12 @@
 #include <string.h>
 
 #include "safetensors.h"
+#include "model.h"
+#include "weights.h"
 
 #define DEFAULT_MODEL_DIR ".cache/Qwen2.5-0.5B"
 #define ENGINE_NAME       "cpulse"
-#define ENGINE_VERSION    "0.2.0"
+#define ENGINE_VERSION    "0.3.0"
 
 static void print_banner(void) {
     printf("============================================================\n");
@@ -192,24 +194,46 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    /* ---- stage 3: config.json -> architecture hyperparameters ---- */
+    char config_path[512];
+    snprintf(config_path, sizeof(config_path), "%s/config.json", model_dir);
+    printf("Loading config: %s\n", config_path);
+    cp_config_t cfg;
+    if (cp_config_load(config_path, &cfg) != 0) {
+        printf("Result: FAIL - config loading failed (see stderr).\n");
+        return 3;
+    }
+    printf("\n");
+    cp_config_print(&cfg);
+
     /* ---- stage 2: parse the safetensors header, build the tensor map ---- */
     char weights_path[512];
     snprintf(weights_path, sizeof(weights_path), "%s/model.safetensors", model_dir);
-    printf("Loading weights: %s\n", weights_path);
+    printf("\nLoading weights: %s\n", weights_path);
 
     st_file_t *f = st_load(weights_path);
     if (!f) {
         printf("Result: FAIL - safetensors parsing failed (see stderr).\n");
-        return 3;
+        return 4;
     }
 
     printf("\nTensor map:\n");
     print_tensor_map(f, full_list);
 
+    /* ---- stage 3b: bind every tensor onto the architecture ---- */
+    printf("\n");
+    cp_weights_t w;
+    if (cp_weights_bind(&cfg, f, &w) != 0) {
+        printf("Result: FAIL - weight binding failed (see stderr).\n");
+        st_free(f);
+        return 5;
+    }
+    cp_weights_print(&w);
+    cp_weights_free(&w);
+
     st_free(f);
 
-    printf("\nResult: OK - toolchain works, weights parsed, tensor map built.\n");
-    printf("Next  : parse config.json, map tensors onto the model architecture,\n");
-    printf("        then implement forward-pass operators.\n");
+    printf("\nResult: OK - config + weights parsed, tensor map built.\n");
+    printf("Next  : forward-pass operators (RMSNorm, attention, MLP).\n");
     return 0;
 }

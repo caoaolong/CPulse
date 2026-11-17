@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void json_skip_ws(json_parser_t *j) {
     while (j->p < j->end &&
@@ -187,5 +188,55 @@ uint64_t json_parse_uint(json_parser_t *j) {
     if (j->p < j->end && (*j->p == '.' || *j->p == 'e' || *j->p == 'E')) {
         j->err = 1; /* floats are not expected in tensor metadata */
     }
+    return v;
+}
+
+/* Match an exact literal (e.g. "true"); sets err on mismatch. */
+static void json_match_literal(json_parser_t *j, const char *lit) {
+    json_skip_ws(j);
+    while (*lit && !j->err) {
+        if (j->p >= j->end || *j->p != *lit) { j->err = 1; return; }
+        j->p++;
+        lit++;
+    }
+}
+
+/* Parse true/false as 1/0. */
+int json_parse_bool(json_parser_t *j) {
+    json_skip_ws(j);
+    if (j->p < j->end && *j->p == 't') {
+        json_match_literal(j, "true");
+        return j->err ? -1 : 1;
+    }
+    if (j->p < j->end && *j->p == 'f') {
+        json_match_literal(j, "false");
+        return j->err ? -1 : 0;
+    }
+    j->err = 1;
+    return -1;
+}
+
+/*
+ * Parse a JSON number as double: [-]int[.frac][e[+-]exp].
+ * Gathered into a small stack buffer and converted with strtod so the
+ * exponent forms in model configs (e.g. 1e-06, 1000000.0) just work.
+ */
+double json_parse_number(json_parser_t *j) {
+    json_skip_ws(j);
+    const char *begin = j->p;
+    if (j->p < j->end && (*j->p == '-' || *j->p == '+')) j->p++;
+    while (j->p < j->end &&
+           ((*j->p >= '0' && *j->p <= '9') || *j->p == '.' ||
+            *j->p == 'e' || *j->p == 'E' || *j->p == '+' || *j->p == '-')) {
+        j->p++;
+    }
+    size_t n = (size_t)(j->p - begin);
+    if (n == 0 || n >= 64) { j->err = 1; return 0.0; }
+    char buf[64];
+    memcpy(buf, begin, n);
+    buf[n] = '\0';
+    char *endptr = NULL;
+    double v = strtod(buf, &endptr);
+    if (!endptr || *endptr != '\0') { j->err = 1; return 0.0; }
     return v;
 }

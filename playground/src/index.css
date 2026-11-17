@@ -10,10 +10,3 @@ html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #0b10
 #hud b { color: #7dd3fc; }
 #hud .dim { color: #fbbf24; }
 #token { color: #4ade80; font-weight: bold; }
-#help {
-  position: fixed; bottom: 12px; left: 12px; z-index: 10;
-  font-family: Consolas, "Courier New", monospace; font-size: 12px;
-  color: #8ea3c7; background: rgba(10, 16, 34, 0.78);
-  border: 1px solid #2b3b63; border-radius: 8px;
-  padding: 8px 12px; user-select: none;
-}

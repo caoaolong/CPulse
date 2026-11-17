@@ -15,6 +15,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#define ST_MKDIR(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#define ST_MKDIR(p) mkdir(p, 0755)
+#endif
+
 /* ------------------------------------------------------------------ */
 /* dtype table                                                        */
 /* ------------------------------------------------------------------ */
@@ -269,9 +278,10 @@ static int parse_tensor_entry(json_parser_t *j, st_tensor_t *t, size_t data_star
 /* ------------------------------------------------------------------ */
 
 /* The parsed header is always written here (relative to the process
- * working directory) so the tensor table can be inspected without
- * scrolling the console. Fixed path on purpose: no option, no plumbing. */
-#define ST_HEADER_DUMP_PATH "header.json"
+ * working directory, i.e. the project root) so the playground frontend
+ * can read it via fetch('/header.json'). Vite serves playground/public
+ * as-is. Fixed path on purpose: no option, no plumbing. */
+#define ST_HEADER_DUMP_PATH "playground/public/header.json"
 
 /* Write a JSON string literal (with quotes) for a NUL-terminated C
  * string. Escapes '"' and '\\' plus control chars; UTF-8 passes through. */
@@ -306,6 +316,14 @@ static void st_dump_header(const st_file_t *f, size_t data_start)
             (unsigned long long)f->header_len, data_start, f->n_tensors);
 
     FILE *fp = fopen(ST_HEADER_DUMP_PATH, "w");
+    if (!fp)
+    {
+        /* playground/public may not exist yet (fresh clone): create the
+         * directory chain and retry once. Errors ignored on purpose. */
+        ST_MKDIR("playground");
+        ST_MKDIR("playground/public");
+        fp = fopen(ST_HEADER_DUMP_PATH, "w");
+    }
     if (!fp)
     {
         fprintf(stderr, "st_dump_header: cannot open '%s' for writing\n",

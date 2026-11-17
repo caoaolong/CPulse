@@ -62,6 +62,12 @@ char *json_parse_string(json_parser_t *j, size_t *out_len);
 /* Parse an unsigned 64-bit integer. Rejects signs and floats. */
 uint64_t json_parse_uint(json_parser_t *j);
 
+/* Parse a JSON number (integer, fraction and/or exponent) as double. */
+double json_parse_number(json_parser_t *j);
+
+/* Parse true/false as 1/0. Anything else sets err. */
+int json_parse_bool(json_parser_t *j);
+
 #ifdef __cplusplus
 }
 #endif
