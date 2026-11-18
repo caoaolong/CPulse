@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug cpulse (gdb)",
+      "name": "Debug cpulse",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/debug/cpulse.exe",
@@ -22,24 +22,24 @@
       ]
     },
     {
-      "name": "Run release (no debug)",
+      "name": "Debug gputest",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/cpulse.exe",
+      "program": "${workspaceFolder}/build/debug/gputest.exe",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",
-      "miDebuggerPath": "gdb"
-    },
-    {
-      "name": "Launch Transformer Web (Chrome)",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:5173/",
-      "webRoot": "${workspaceFolder}/playground"
+      "miDebuggerPath": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
     }
   ]
 }

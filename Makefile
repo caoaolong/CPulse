@@ -83,7 +83,9 @@ else
 endif
 
 # ---------------------------------------------------------------- targets
-.PHONY: all debug run clean help
+.PHONY: all debug run clean help gputest gputest-debug
+
+GPUTEST := $(BUILD)/gputest.exe
 
 all: $(BUILD)/$(TARGET_NAME)
 
@@ -107,11 +109,24 @@ debug:
 run: all
 	$(call RUN_BIN,$(BUILD)/$(TARGET_NAME))
 
+# GPU parity test (CPU vs CUDA driver-API matvec). Explicit file list:
+# tests/ is outside the src/*.c wildcard so gputest's own main()
+# never leaks into the cpulse binary.
+gputest: $(GPUTEST)
+
+$(GPUTEST): tests/gputest.c src/ops.c src/gpu.c | $(BUILD)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
+
+# debug build of the GPU parity test: same rule, but -O0 -g3
+# into build/debug/ so F5 can set breakpoints in it.
+gputest-debug:
+	$(MAKE) BUILD=$(BUILD)/debug CFLAGS="$(CFLAGS_DEBUG)" gputest
+
 clean:
 	$(call RM_RF,$(BUILD))
 
 help:
-	@echo "targets: all (default) | debug | run | clean"
+	@echo "targets: all (default) | debug | run | gputest | gputest-debug | clean"
 
 # auto-include generated dependency files (incremental rebuild correctness)
 -include $(DEPS)
