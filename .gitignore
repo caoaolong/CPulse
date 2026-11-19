@@ -1,7 +1,6 @@
 .cache
 build
 header.json
+cpulse.log
 
-playground/node_modules/
-playground/dist/
 *.log

@@ -14,15 +14,15 @@
  *                        section, i.e. to byte 8+N of the file)
  *   [8+N .. EOF)      : contiguous raw tensor data
  *
- * This module loads the whole file into memory, parses the JSON header
- * with the small standalone parser in json.h/json.c (no third-party
- * dependencies), and exposes a flat metadata table with direct pointers
- * into the data.
+ * This module maps the whole file read-only (mmap on POSIX, plain
+ * fread on native Windows), parses the JSON header with the small
+ * standalone parser in json.h/json.c (no third-party dependencies),
+ * and exposes a flat metadata table with direct pointers into the
+ * mapped data. Pages are faulted in on first touch, so embed-only
+ * flows never pay for the rest of the file.
  *
- * Design note: the entire file is read with malloc + fread. Memory-mapped
- * loading (CreateFileMapping / mmap) is a possible later optimization; the
- * st_tensor_t.data pointers would stay identical since they already point
- * into st_file_t.buf.
+ * Design note: tensor data is zero-copy in both paths: st_tensor_t.data
+ * points into st_file_t.buf and must not outlive it.
  */
 
 #ifndef SAFETENSORS_H

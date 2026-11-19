@@ -86,3 +86,10 @@ void cp_embed(float *y, const uint16_t *E, size_t hidden, uint32_t tok) {
         y[i] = cp_bf16_to_fp32(row[i]);
     }
 }
+
+void cp_embed_seq(float *Y, const uint16_t *E, size_t hidden,
+                  const uint32_t *toks, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        cp_embed(Y + i * hidden, E, hidden, toks[i]);
+    }
+}

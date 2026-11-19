@@ -15,13 +15,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define ST_MKDIR(p) _mkdir(p)
-#else
+#ifndef _WIN32
 #include <sys/stat.h>
 #include <sys/types.h>
-#define ST_MKDIR(p) mkdir(p, 0755)
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 
 /* ------------------------------------------------------------------ */
@@ -85,6 +84,7 @@ static uint64_t read_le64(const uint8_t *p)
     return (uint64_t)p[0] | ((uint64_t)p[1] << 8) | ((uint64_t)p[2] << 16) | ((uint64_t)p[3] << 24) | ((uint64_t)p[4] << 32) | ((uint64_t)p[5] << 40) | ((uint64_t)p[6] << 48) | ((uint64_t)p[7] << 56);
 }
 
+#ifdef _WIN32
 static uint8_t *read_entire_file(const char *path, size_t *out_size)
 {
     FILE *fp = fopen(path, "rb");
@@ -95,15 +95,9 @@ static uint8_t *read_entire_file(const char *path, size_t *out_size)
     }
 
     long long fsz;
-#ifdef _WIN32
     _fseeki64(fp, 0, SEEK_END);
     fsz = _ftelli64(fp);
     _fseeki64(fp, 0, SEEK_SET);
-#else
-    fseek(fp, 0, SEEK_END);
-    fsz = (long long)ftell(fp); /* fine for < 2 GiB; use ftello for larger */
-    fseek(fp, 0, SEEK_SET);
-#endif
 
     if (fsz <= 0)
     {
@@ -129,6 +123,52 @@ static uint8_t *read_entire_file(const char *path, size_t *out_size)
     fclose(fp);
     *out_size = (size_t)fsz;
     return buf;
+}
+#endif /* _WIN32 */
+
+/*
+ * Map the whole file read-only (POSIX). Header parsing and tensor
+ * pointers work on the mapping directly; the OS pages data in on
+ * first touch, so `--input` (embed-only) never faults in the other
+ * ~700 MB. The mapping stays valid after close(fd).
+ */
+static uint8_t *map_entire_file(const char *path, size_t *out_size)
+{
+    int fd = open(path, O_RDONLY);
+    if (fd < 0)
+    {
+        fprintf(stderr, "st_load: cannot open '%s'\n", path);
+        return NULL;
+    }
+    struct stat st;
+    if (fstat(fd, &st) != 0 || st.st_size <= 0)
+    {
+        fprintf(stderr, "st_load: '%s' is empty or unreadable\n", path);
+        close(fd);
+        return NULL;
+    }
+    size_t size = (size_t)st.st_size;
+    void *p = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (p == MAP_FAILED)
+    {
+        fprintf(stderr, "st_load: mmap failed on '%s'\n", path);
+        return NULL;
+    }
+    *out_size = size;
+    return (uint8_t *)p;
+}
+
+/* Release the file buffer: munmap on POSIX, free on native Windows. */
+static void release_file_buf(st_file_t *f)
+{
+#ifdef _WIN32
+    free(f->buf);
+#else
+    if (f->buf && f->buf_size) munmap(f->buf, f->buf_size);
+#endif
+    f->buf = NULL;
+    f->buf_size = 0;
 }
 
 static int tensor_push(st_file_t *f, st_tensor_t t)
@@ -274,88 +314,17 @@ static int parse_tensor_entry(json_parser_t *j, st_tensor_t *t, size_t data_star
 }
 
 /* ------------------------------------------------------------------ */
-/* logging                                                            */
+/* load                                                             */
 /* ------------------------------------------------------------------ */
-
-/* The parsed header is always written here (relative to the process
- * working directory, i.e. the project root) so the playground frontend
- * can read it via fetch('/header.json'). Vite serves playground/public
- * as-is. Fixed path on purpose: no option, no plumbing. */
-#define ST_HEADER_DUMP_PATH "playground/public/header.json"
-
-/* Write a JSON string literal (with quotes) for a NUL-terminated C
- * string. Escapes '"' and '\\' plus control chars; UTF-8 passes through. */
-static void json_write_escaped(FILE *fp, const char *s)
-{
-    fputc('"', fp);
-    for (const unsigned char *p = (const unsigned char *)s; *p; p++)
-    {
-        if (*p == '"' || *p == '\\')
-        {
-            fputc('\\', fp);
-            fputc(*p, fp);
-        }
-        else if (*p < 0x20)
-        {
-            fprintf(fp, "\\u%04x", *p);
-        }
-        else
-        {
-            fputc(*p, fp);
-        }
-    }
-    fputc('"', fp);
-}
-
-/* Dump the parsed header as JSON (see ST_HEADER_DUMP_PATH), plus a
- * one-line summary to stderr. The summary is tiny on purpose: when
- * stderr is a pipe (e.g. under a debugger) a large burst can block. */
-static void st_dump_header(const st_file_t *f, size_t data_start)
-{
-    fprintf(stderr, "st_load: header parsed: header_len=%llu bytes, data_start=%zu, n_tensors=%zu\n",
-            (unsigned long long)f->header_len, data_start, f->n_tensors);
-
-    FILE *fp = fopen(ST_HEADER_DUMP_PATH, "w");
-    if (!fp)
-    {
-        /* playground/public may not exist yet (fresh clone): create the
-         * directory chain and retry once. Errors ignored on purpose. */
-        ST_MKDIR("playground");
-        ST_MKDIR("playground/public");
-        fp = fopen(ST_HEADER_DUMP_PATH, "w");
-    }
-    if (!fp)
-    {
-        fprintf(stderr, "st_dump_header: cannot open '%s' for writing\n",
-                ST_HEADER_DUMP_PATH);
-        return;
-    }
-    fprintf(fp, "{\n  \"header_len\": %llu,\n  \"data_start\": %zu,\n  \"n_tensors\": %zu,\n  \"tensors\": [\n",
-            (unsigned long long)f->header_len, data_start, f->n_tensors);
-    for (size_t i = 0; i < f->n_tensors; i++)
-    {
-        const st_tensor_t *t = &f->tensors[i];
-        fprintf(fp, "    {\"name\": ");
-        json_write_escaped(fp, t->name);
-        fprintf(fp, ", \"dtype\": \"%s\", \"shape\": [", st_dtype_name(t->dtype));
-        for (size_t d = 0; d < t->ndim; d++)
-        {
-            fprintf(fp, "%s%zu", d ? ", " : "", t->shape[d]);
-        }
-        fprintf(fp, "], \"data_offsets\": [%zu, %zu], \"nbytes\": %zu, \"data_offset\": %zu}%s\n",
-                t->data_offset - data_start,
-                t->data_offset - data_start + t->nbytes,
-                t->nbytes, t->data_offset,
-                i + 1 < f->n_tensors ? "," : "");
-    }
-    fprintf(fp, "  ]\n}\n");
-    fclose(fp);
-}
 
 st_file_t *st_load(const char *path)
 {
     size_t size = 0;
+#ifdef _WIN32
     uint8_t *buf = read_entire_file(path, &size);
+#else
+    uint8_t *buf = map_entire_file(path, &size);
+#endif
     if (!buf)
         return NULL;
 
@@ -451,8 +420,10 @@ st_file_t *st_load(const char *path)
         return NULL;
     }
 
-    /* header parsed OK: dump the results into the log */
-    st_dump_header(f, data_start);
+    /* header parsed OK: one-line summary to stderr (tiny on purpose:
+     * when stderr is a pipe, e.g. under a debugger, a burst can block) */
+    fprintf(stderr, "st_load: header parsed: header_len=%llu bytes, data_start=%zu, n_tensors=%zu\n",
+            (unsigned long long)f->header_len, data_start, f->n_tensors);
 
     /* resolve absolute data pointers and validate against the file bounds */
     for (size_t i = 0; i < f->n_tensors; i++)
@@ -480,7 +451,7 @@ void st_free(st_file_t *f)
         free(f->tensors[i].name);
     }
     free(f->tensors);
-    free(f->buf);
+    release_file_buf(f);
     free(f);
 }
 

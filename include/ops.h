@@ -47,6 +47,10 @@ void cp_swiglu(float *y, const float *gate, const float *up, size_t n);
  * Caller must ensure tok < vocab. */
 void cp_embed(float *y, const uint16_t *E, size_t hidden, uint32_t tok);
 
+/* Sequence embedding: Y[i*hidden..] = E[toks[i]] for i in [0, n). */
+void cp_embed_seq(float *Y, const uint16_t *E, size_t hidden,
+                  const uint32_t *toks, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

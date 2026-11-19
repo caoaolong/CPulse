@@ -3,17 +3,13 @@
  *
  * Project : CPulse - minimal LLM inference engine written from scratch in C
  * Model   : Qwen2.5-0.5B (decoder-only Transformer)
- * Stage   : 3 - config loading (weight mapping comes next)
  *
- * What this stage does:
- *   - verify the model weights are present and discoverable
- *   - parse the safetensors file header (hand-rolled minimal JSON parser)
- *   - print the full "tensor map": every tensor's name/shape/dtype/size,
- *     plus aggregate statistics used as the ground truth for later stages
+ * Startup: verify model files, load config + weights, bind tensors.
+ * With --input <text>: tokenize the text and embed it.
  *
  * Usage:
  *   ./build/cpulse.exe                 summary output
- *   ./build/cpulse.exe --list          dump every tensor
+ *   ./build/cpulse.exe --input <text>  tokenize + embed text
  *   ./build/cpulse.exe --model <dir>   use a different model directory
  *
  * Build:
@@ -29,109 +25,34 @@
 #include "safetensors.h"
 #include "model.h"
 #include "weights.h"
+#include "tokenizer.h"
+#include "ops.h"
+#include "log.h"
 
 #define DEFAULT_MODEL_DIR ".cache/Qwen2.5-0.5B"
 #define ENGINE_NAME       "cpulse"
 #define ENGINE_VERSION    "0.3.0"
 
-static void print_banner(void) {
-    printf("============================================================\n");
-    printf("  %s v%s - C inference engine for Qwen2.5-0.5B\n", ENGINE_NAME, ENGINE_VERSION);
-    printf("  built: %s %s, C11, gcc/MinGW-w64\n", __DATE__, __TIME__);
-    printf("============================================================\n");
-}
-
-/* Check that a required model file exists; returns 0 if OK, -1 if missing */
+/* Check that a required model file exists; silent on success,
+ * one MISS line on failure. Returns 0 if OK, -1 if missing. */
 static int check_file(const char *base, const char *name) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", base, name);
     FILE *fp = fopen(path, "rb");
     if (!fp) {
-        printf("  [MISS] %-24s (%s)\n", name, path);
+        printf("  [MISS] %s\n", path);
         return -1;
     }
-    long long size = -1;
-#ifdef _WIN32
-    _fseeki64(fp, 0, SEEK_END);
-    size = _ftelli64(fp);
-#else
-    fseek(fp, 0, SEEK_END);
-    size = (long long)ftell(fp);
-#endif
     fclose(fp);
-    printf("  [ OK ] %-24s %10.1f KB\n", name, size / 1024.0);
     return 0;
 }
 
-/* one-line description of a tensor for the map dump */
-static void print_tensor_line(const st_tensor_t *t) {
-    printf("  %-46s %-5s [", t->name, st_dtype_name(t->dtype));
-    for (size_t i = 0; i < t->ndim; i++) {
-        printf("%s%zu", i ? ", " : "", t->shape[i]);
-    }
-    printf("] %10.1f KB\n", t->nbytes / 1024.0);
-}
-
-static int is_layer_tensor(const char *name) {
-    return strncmp(name, "model.layers.", 13) == 0;
-}
-
-static void print_tensor_map(const st_file_t *f, int full_list) {
-    /* ---- aggregate statistics (the ground truth for later stages) ---- */
-    uint64_t total_params = 0;
-    uint64_t total_bytes = 0;
-    size_t   dtype_count[ST_DTYPE_COUNT] = {0};
-    size_t   n_layer_tensors = 0;
-
-    for (size_t i = 0; i < f->n_tensors; i++) {
-        const st_tensor_t *t = &f->tensors[i];
-        uint64_t prod = 1;
-        for (size_t d = 0; d < t->ndim; d++) prod *= t->shape[d];
-        total_params += prod;
-        total_bytes += t->nbytes;
-        if (t->dtype < ST_DTYPE_COUNT) dtype_count[t->dtype]++;
-        if (is_layer_tensor(t->name)) n_layer_tensors++;
-    }
-
-    printf("Header length : %llu bytes\n", (unsigned long long)f->header_len);
-    printf("Tensors       : %zu\n", f->n_tensors);
-    printf("  layer-bound : %zu (model.layers.*)\n", n_layer_tensors);
-    printf("  other       : %zu\n", f->n_tensors - n_layer_tensors);
-    printf("Total params  : %llu (%.1f M)\n",
-           (unsigned long long)total_params, total_params / 1.0e6);
-    printf("Total weights : %llu bytes (%.1f MB)\n",
-           (unsigned long long)total_bytes, total_bytes / (1024.0 * 1024.0));
-    printf("Dtypes        : ");
-    for (int d = 0; d < ST_DTYPE_COUNT; d++) {
-        if (dtype_count[d] > 0) {
-            printf("%s x %zu  ", st_dtype_name((st_dtype_t)d), dtype_count[d]);
-        }
-    }
-    printf("\n");
-
-    /* ---- non-layer tensors (embeddings, final norm, lm_head, ...) ---- */
-    printf("\nNon-layer tensors:\n");
-    for (size_t i = 0; i < f->n_tensors; i++) {
-        if (!is_layer_tensor(f->tensors[i].name)) {
-            print_tensor_line(&f->tensors[i]);
-        }
-    }
-
-    /* ---- layer 0 in full: shows the per-block structure ---- */
-    printf("\nLayer 0 tensors (per-block template):\n");
-    for (size_t i = 0; i < f->n_tensors; i++) {
-        if (strncmp(f->tensors[i].name, "model.layers.0.", 15) == 0) {
-            print_tensor_line(&f->tensors[i]);
-        }
-    }
-
-    /* ---- full dump on request ---- */
-    if (full_list) {
-        printf("\nAll tensors:\n");
-        for (size_t i = 0; i < f->n_tensors; i++) {
-            print_tensor_line(&f->tensors[i]);
-        }
-    }
+/* Open the structured run log next to the binary's working directory.
+ * Returns the path used, or NULL on failure. */
+static const char *init_verbose_log(void) {
+    cp_log_init("cpulse.log");
+    if (cp_log_on()) return "cpulse.log";
+    return NULL;
 }
 
 /* VS Code cppdbg on Windows appends "2>CON 1>CON <CON" to the debuggee
@@ -146,23 +67,41 @@ static int is_console_redir_token(const char *arg) {
 }
 
 static void print_usage(const char *prog) {
-    printf("Usage: %s [--model <model_dir>] [--list]\n", prog);
+    printf("Usage: %s [--model <model_dir>] [--input <text>] [--token <token>] [--verbose]\n", prog);
     printf("  --model <model_dir>   path to the model directory\n");
     printf("                        (default: %s)\n", DEFAULT_MODEL_DIR);
-    printf("  --list                dump every tensor in the weight file\n");
+    printf("  --input <text>        tokenize <text> and embed it\n");
+    printf("  --token <token>       print the vocab id of one surface-form token\n");
+    printf("  --verbose             write pipeline debug log to cpulse.log\n");
 }
 
 int main(int argc, char **argv) {
     const char *model_dir = DEFAULT_MODEL_DIR;
-    int full_list = 0;
+    const char *input_text = NULL;
+    const char *token_text = NULL;
+    int verbose = 0;
 
     for (int i = 1; i < argc; i++) {
         if (is_console_redir_token(argv[i])) {
             continue;
         } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
             model_dir = argv[++i];
-        } else if (strcmp(argv[i], "--list") == 0) {
-            full_list = 1;
+        } else if (strcmp(argv[i], "--input") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --input\n");
+                print_usage(argv[0]);
+                return 1;
+            }
+            input_text = argv[++i];
+        } else if (strcmp(argv[i], "--token") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --token\n");
+                print_usage(argv[0]);
+                return 1;
+            }
+            token_text = argv[++i];
+        } else if (strcmp(argv[i], "--verbose") == 0) {
+            verbose = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
             return 0;
@@ -173,13 +112,60 @@ int main(int argc, char **argv) {
         }
     }
 
-    print_banner();
-    printf("\n");
-    printf("Model directory : %s\n", model_dir);
-    printf("\n");
+    printf("%s v%s | model %s\n", ENGINE_NAME, ENGINE_VERSION, model_dir);
+    if (verbose) {
+        const char *logpath = init_verbose_log();
+        if (!logpath) {
+            fprintf(stderr, "warning: cannot open run log, continuing quiet\n");
+        } else {
+            atexit(cp_log_close);
+            printf("verbose log: %s\n", logpath);
+        }
+        cp_log_begin("log");
+        cp_log_u("version", 1);
+        cp_log_end();
+        cp_log_begin("model");
+        cp_log_s("dir", model_dir, strlen(model_dir));
+        cp_log_end();
+    }
 
-    /* ---- stage 1 gate: raw files present ---- */
-    printf("Checking model files...\n");
+    /* ---- direct vocab lookup: tokenizer only, no weights loaded ---- */
+    if (token_text) {
+        cp_tok_t *tok = NULL;
+        if (cp_tok_load(&tok, model_dir) != 0) {
+            printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
+            return 6;
+        }
+        uint32_t id = 0;
+        int rc = 0;
+        if (cp_tok_lookup(tok, token_text, &id) == 0) {
+            printf("token \"%s\" -> id %u\n", token_text, id);
+        } else {
+            /* not a single vocab entry: show how it encodes as text */
+            size_t cap = strlen(token_text) * 4 + 16;
+            uint32_t *ids = malloc(cap * sizeof *ids);
+            if (!ids) {
+                printf("Result: FAIL - out of memory.\n");
+                cp_tok_free(tok);
+                return 6;
+            }
+            int n = cp_tok_encode(tok, token_text, ids, cap);
+            if (n < 0) {
+                printf("Result: FAIL - tokenization failed (see stderr).\n");
+                free(ids);
+                cp_tok_free(tok);
+                return 6;
+            }
+            printf("token \"%s\" not in vocab as-is; as text ->", token_text);
+            for (int i = 0; i < n; i++) printf(" %u", ids[i]);
+            printf("\n");
+            free(ids);
+        }
+        cp_tok_free(tok);
+        return rc;
+    }
+
+    /* ---- stage 1 gate: raw files present (silent unless missing) ---- */
     int ok = 1;
     ok &= check_file(model_dir, "config.json") == 0;
     ok &= check_file(model_dir, "model.safetensors") == 0;
@@ -187,7 +173,6 @@ int main(int argc, char **argv) {
     ok &= check_file(model_dir, "tokenizer_config.json") == 0;
     ok &= check_file(model_dir, "vocab.json") == 0;
     ok &= check_file(model_dir, "merges.txt") == 0;
-    printf("\n");
     if (!ok) {
         printf("Result: FAIL - some model files are missing.\n");
         printf("Hint  : run scripts/download_model.ps1 to fetch the model.\n");
@@ -197,19 +182,30 @@ int main(int argc, char **argv) {
     /* ---- stage 3: config.json -> architecture hyperparameters ---- */
     char config_path[512];
     snprintf(config_path, sizeof(config_path), "%s/config.json", model_dir);
-    printf("Loading config: %s\n", config_path);
     cp_config_t cfg;
     if (cp_config_load(config_path, &cfg) != 0) {
         printf("Result: FAIL - config loading failed (see stderr).\n");
         return 3;
     }
-    printf("\n");
-    cp_config_print(&cfg);
+    printf("arch: %s vocab=%u hidden=%u inter=%u layers=%u heads=%u/%u\n",
+           cfg.model_type, cfg.vocab_size, cfg.hidden_size,
+           cfg.intermediate_size, cfg.num_hidden_layers,
+           cfg.num_attention_heads, cfg.num_key_value_heads);
+    if (verbose) {
+        cp_log_begin("arch");
+        cp_log_s("model", cfg.model_type, strlen(cfg.model_type));
+        cp_log_u("vocab", cfg.vocab_size);
+        cp_log_u("hidden", cfg.hidden_size);
+        cp_log_u("inter", cfg.intermediate_size);
+        cp_log_u("layers", cfg.num_hidden_layers);
+        cp_log_u("qheads", cfg.num_attention_heads);
+        cp_log_u("kvheads", cfg.num_key_value_heads);
+        cp_log_end();
+    }
 
     /* ---- stage 2: parse the safetensors header, build the tensor map ---- */
     char weights_path[512];
     snprintf(weights_path, sizeof(weights_path), "%s/model.safetensors", model_dir);
-    printf("\nLoading weights: %s\n", weights_path);
 
     st_file_t *f = st_load(weights_path);
     if (!f) {
@@ -217,23 +213,164 @@ int main(int argc, char **argv) {
         return 4;
     }
 
-    printf("\nTensor map:\n");
-    print_tensor_map(f, full_list);
+    {
+        uint64_t total_params = 0, total_bytes = 0;
+        for (size_t i = 0; i < f->n_tensors; i++) {
+            uint64_t prod = 1;
+            for (size_t d = 0; d < f->tensors[i].ndim; d++)
+                prod *= f->tensors[i].shape[d];
+            total_params += prod;
+            total_bytes += f->tensors[i].nbytes;
+        }
+        printf("weights: %zu tensors, %.1fM params, %.1f MB\n",
+               f->n_tensors, total_params / 1.0e6,
+               total_bytes / (1024.0 * 1024.0));
+        if (verbose) {
+            cp_log_begin("weights");
+            cp_log_u("tensors", f->n_tensors);
+            cp_log_u("params", total_params);
+            cp_log_u("bytes", total_bytes);
+            cp_log_end();
+        }
+    }
 
     /* ---- stage 3b: bind every tensor onto the architecture ---- */
-    printf("\n");
     cp_weights_t w;
     if (cp_weights_bind(&cfg, f, &w) != 0) {
         printf("Result: FAIL - weight binding failed (see stderr).\n");
         st_free(f);
         return 5;
     }
-    cp_weights_print(&w);
+    printf("bind: %zu/%zu tensors OK%s\n",
+           w.n_bound, w.n_expected, w.tied_head ? " (tied head)" : "");
+    if (verbose) {
+        cp_log_begin("bind");
+        cp_log_u("bound", w.n_bound);
+        cp_log_u("expected", w.n_expected);
+        cp_log_u("tied", w.tied_head ? 1u : 0u);
+        cp_log_end();
+    }
+
+    /* ---- user text -> token ids -> embedding vectors ---- */
+    if (input_text) {
+        printf("input: %s\n", input_text);
+        if (verbose) {
+            cp_log_begin("input");
+            cp_log_s("text", input_text, strlen(input_text));
+            cp_log_end();
+        }
+        cp_tok_t *tok = NULL;
+        if (cp_tok_load(&tok, model_dir) != 0) {
+            printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
+            cp_weights_free(&w);
+            st_free(f);
+            return 6;
+        }
+        size_t cap = strlen(input_text) * 4 + 16;
+        uint32_t *ids = malloc(cap * sizeof *ids);
+        float *emb = NULL;
+        if (!ids) {
+            printf("Result: FAIL - out of memory.\n");
+            cp_tok_free(tok);
+            cp_weights_free(&w);
+            st_free(f);
+            return 6;
+        }
+        int n = cp_tok_encode(tok, input_text, ids, cap);
+        if (n < 0) {
+            printf("Result: FAIL - tokenization failed (see stderr).\n");
+            free(ids);
+            cp_tok_free(tok);
+            cp_weights_free(&w);
+            st_free(f);
+            return 6;
+        }
+        printf("tokens (%d):", n);
+        for (int i = 0; i < n; i++) printf(" %u", ids[i]);
+        printf("\n");
+        if (verbose) {
+            cp_log_begin("tokens");
+            cp_log_u("count", (unsigned long long)n);
+            cp_log_end();
+        }
+        /* per-token surface forms straight from the vocab */
+        {
+            char *piece = malloc(strlen(input_text) * 3 + 16);
+            if (!piece) {
+                printf("Result: FAIL - out of memory.\n");
+                free(ids);
+                cp_tok_free(tok);
+                cp_weights_free(&w);
+                st_free(f);
+                return 6;
+            }
+            printf("pieces (%d):", n);
+            for (int i = 0; i < n; i++) {
+                if (cp_tok_decode(tok, &ids[i], 1, piece,
+                                  strlen(input_text) * 3 + 16) < 0) {
+                    printf(" [%u]<?>", ids[i]);
+                    continue;
+                }
+                printf(" [%u]\"", ids[i]);
+                for (const char *p = piece; *p; p++) {
+                    if (*p == '\n') printf("\\n");
+                    else if (*p == '\r') printf("\\r");
+                    else if (*p == '\t') printf("\\t");
+                    else if (*p == '"') printf("\\\"");
+                    else putchar(*p);
+                }
+                putchar('"');
+                if (verbose) {
+                    cp_log_begin("token");
+                    cp_log_u("index", (unsigned long long)i);
+                    cp_log_u("id", ids[i]);
+                    cp_log_s("text", piece, strlen(piece));
+                    cp_log_end();
+                }
+            }
+            printf("\n");
+            free(piece);
+        }
+        if (n > 0) {
+            emb = malloc((size_t)n * cfg.hidden_size * sizeof *emb);
+            if (!emb) {
+                printf("Result: FAIL - out of memory.\n");
+                free(ids);
+                cp_tok_free(tok);
+                cp_weights_free(&w);
+                st_free(f);
+                return 6;
+            }
+            cp_embed_seq(emb, (const uint16_t *)w.embed_tokens->data,
+                         cfg.hidden_size, ids, (size_t)n);
+            printf("embed [%d x %u]:", n, cfg.hidden_size);
+            for (uint32_t i = 0; i < cfg.hidden_size && i < 8; i++)
+                printf(" %.4f", emb[i]);
+            printf("\n");
+            if (verbose) {
+                cp_log_begin("embed");
+                cp_log_u("rows", (unsigned long long)n);
+                cp_log_u("dim", cfg.hidden_size);
+                cp_log_end();
+                for (int i = 0; i < n; i++) {
+                    cp_log_begin("vector");
+                    cp_log_u("index", (unsigned long long)i);
+                    cp_log_u("id", ids[i]);
+                    cp_log_u("dim", cfg.hidden_size);
+                    cp_log_v(emb + (size_t)i * cfg.hidden_size,
+                             cfg.hidden_size);
+                    cp_log_end();
+                }
+            }
+        }
+        free(emb);
+        free(ids);
+        cp_tok_free(tok);
+    }
     cp_weights_free(&w);
 
     st_free(f);
 
-    printf("\nResult: OK - config + weights parsed, tensor map built.\n");
-    printf("Next  : forward-pass operators (RMSNorm, attention, MLP).\n");
+    printf("OK\n");
     return 0;
 }
