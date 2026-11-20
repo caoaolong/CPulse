@@ -4,7 +4,9 @@
  * Parses the flat config object with the standalone parser in
  * json.h/json.c. Unknown keys are skipped so extra vendor fields
  * never break loading; every required key is tracked and missing
- * keys fail the load.
+ * keys fail the load. One exception: rope_scaling must be absent or
+ * null (standard RoPE); anything else fails loudly, since it would
+ * silently change position handling.
  */
 
 #include "model.h"
@@ -146,6 +148,21 @@ int cp_config_load(const char *path, cp_config_t *out) {
         } else if (strcmp(key, "model_type") == 0) {
             copy_str(out->model_type, sizeof(out->model_type),
                      json_parse_string(&j, NULL)); seen |= REQ_MODEL_TYPE;
+        } else if (strcmp(key, "rope_scaling") == 0) {
+            /* Explicit contract: only standard RoPE is supported. Absent
+             * or null means standard RoPE. Anything else (e.g.
+             * {"type":"yarn",...}) would silently shift positions, so fail
+             * loudly instead of skipping it like other unknown keys. */
+            static const char null_lit[] = "null";
+            int is_null = 1;
+            for (size_t k = 0; k < sizeof null_lit - 1; k++) {
+                if (json_next(&j) != null_lit[k]) { is_null = 0; break; }
+            }
+            if (!is_null) {
+                fprintf(stderr, "cp_config: unsupported rope_scaling "
+                        "(only standard RoPE, i.e. absent or null, is supported)\n");
+                j.err = 1;
+            }
         } else if (strcmp(key, "torch_dtype") == 0) {
             copy_str(out->torch_dtype, sizeof(out->torch_dtype),
                      json_parse_string(&j, NULL));

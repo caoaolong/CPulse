@@ -43,6 +43,41 @@ void cp_rope(float *t, size_t n_heads, size_t head_dim,
 /* SwiGLU MLP activation: y[i] = (gate[i] * sigmoid(gate[i])) * up[i]. */
 void cp_swiglu(float *y, const float *gate, const float *up, size_t n);
 
+/* One attention layer's KV cache: k/v hold `len` tokens of `kv_dim`
+ * floats each; storage grows geometrically and preserves contents. */
+typedef struct {
+    float *k;
+    float *v;
+    size_t len;
+    size_t cap;
+    size_t kv_dim;
+} cp_kv_t;
+
+/* Ensure room for n tokens total (no-op if already enough). Sets the
+ * per-token dim on first use; mismatched dim or OOM returns -1. */
+int cp_kv_reserve(cp_kv_t *kv, size_t kv_dim, size_t n);
+
+/* Append one token's k/v row (kv_dim floats each). kv_dim must have
+ * been set by an earlier reserve; grows automatically when full. */
+void cp_kv_push(cp_kv_t *kv, const float *k_one, const float *v_one);
+
+/* Release buffers; safe on zeroed cache, reusable afterwards. */
+void cp_kv_free(cp_kv_t *kv);
+
+/*
+ * Single-query causal GQA attention.
+ *   q: [n_heads * head_dim], already RoPE'd.
+ *   k, v: [(pos+1) * kv_heads * head_dim] cache prefix, already RoPE'd.
+ *   out: [n_heads * head_dim].
+ * Query head h attends KV head h / (n_heads / kv_heads); scores are
+ * scaled by 1/sqrt(head_dim); only positions 0..pos participate.
+ * Summation order is j-inner (matches the future GPU kernel).
+ * Callers must hold at least pos+1 cached tokens; n_heads must be
+ * a multiple of kv_heads (validated for Qwen2 in model.c).
+ */
+void cp_attention(float *out, const float *q, const float *k, const float *v,
+                  size_t n_heads, size_t kv_heads, size_t head_dim, size_t pos);
+
 /* Embedding lookup: y[0..hidden) = BF16 row `tok` of E [vocab, hidden].
  * Caller must ensure tok < vocab. */
 void cp_embed(float *y, const uint16_t *E, size_t hidden, uint32_t tok);
