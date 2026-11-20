@@ -5,7 +5,10 @@
  * Model   : Qwen2.5-0.5B (decoder-only Transformer)
  *
  * Startup: verify model files, load config + weights, bind tensors.
- * With --input <text>: tokenize the text and embed it.
+ * With --input <text>: greedy-generate a raw-text continuation (this
+ * checkpoint is the Qwen2.5-0.5B base model: no chat template).
+ * With --gpu: run the forward pass on CUDA (falls back to cpu).
+ * With --token <t>: print the vocab id of one surface-form token.
  *
  * Usage:
  *   ./build/cpulse.exe                 summary output
@@ -27,11 +30,23 @@
 #include "weights.h"
 #include "tokenizer.h"
 #include "ops.h"
+#include "forward.h"
 #include "log.h"
 
 #define DEFAULT_MODEL_DIR ".cache/Qwen2.5-0.5B"
 #define ENGINE_NAME       "cpulse"
 #define ENGINE_VERSION    "0.3.0"
+#define DEFAULT_MAX_NEW    64
+#define IM_END_ID        151645u
+
+/* First-index-wins argmax over the logits row. */
+static uint32_t argmax(const float *v, uint32_t n) {
+    uint32_t best = 0;
+    for (uint32_t i = 1; i < n; i++) {
+        if (v[i] > v[best]) best = i;
+    }
+    return best;
+}
 
 /* Check that a required model file exists; silent on success,
  * one MISS line on failure. Returns 0 if OK, -1 if missing. */
@@ -67,11 +82,13 @@ static int is_console_redir_token(const char *arg) {
 }
 
 static void print_usage(const char *prog) {
-    printf("Usage: %s [--model <model_dir>] [--input <text>] [--token <token>] [--verbose]\n", prog);
+    printf("Usage: %s [--model <model_dir>] [--input <text>] [--token <token>] [--max-new <n>] [--verbose]\n", prog);
     printf("  --model <model_dir>   path to the model directory\n");
     printf("                        (default: %s)\n", DEFAULT_MODEL_DIR);
-    printf("  --input <text>        tokenize <text> and embed it\n");
+    printf("  --input <text>        greedy-generate a continuation of <text>\n");
     printf("  --token <token>       print the vocab id of one surface-form token\n");
+    printf("  --max-new <n>         tokens to generate (default %d)\n", DEFAULT_MAX_NEW);
+    printf("  --gpu                 run the forward pass on CUDA (falls back to cpu)\n");
     printf("  --verbose             write pipeline debug log to cpulse.log\n");
 }
 
@@ -79,6 +96,8 @@ int main(int argc, char **argv) {
     const char *model_dir = DEFAULT_MODEL_DIR;
     const char *input_text = NULL;
     const char *token_text = NULL;
+    int max_new = DEFAULT_MAX_NEW;
+    int use_gpu = 0;
     int verbose = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -100,6 +119,16 @@ int main(int argc, char **argv) {
                 return 1;
             }
             token_text = argv[++i];
+        } else if (strcmp(argv[i], "--max-new") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --max-new\n");
+                print_usage(argv[0]);
+                return 1;
+            }
+            max_new = atoi(argv[++i]);
+            if (max_new <= 0) max_new = DEFAULT_MAX_NEW;
+        } else if (strcmp(argv[i], "--gpu") == 0) {
+            use_gpu = 1;
         } else if (strcmp(argv[i], "--verbose") == 0) {
             verbose = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -268,7 +297,6 @@ int main(int argc, char **argv) {
         }
         size_t cap = strlen(input_text) * 4 + 16;
         uint32_t *ids = malloc(cap * sizeof *ids);
-        float *emb = NULL;
         if (!ids) {
             printf("Result: FAIL - out of memory.\n");
             cp_tok_free(tok);
@@ -332,38 +360,57 @@ int main(int argc, char **argv) {
             free(piece);
         }
         if (n > 0) {
-            emb = malloc((size_t)n * cfg.hidden_size * sizeof *emb);
-            if (!emb) {
-                printf("Result: FAIL - out of memory.\n");
+            /* ---- prefill + greedy decode (base model: raw continuation) ---- */
+            cp_forward_t *fw = NULL;
+            if (cp_forward_init(&fw, &cfg, &w, use_gpu) != 0) {
+                printf("Result: FAIL - forward init failed (see stderr).\n");
                 free(ids);
                 cp_tok_free(tok);
                 cp_weights_free(&w);
                 st_free(f);
-                return 6;
+                return 7;
             }
-            cp_embed_seq(emb, (const uint16_t *)w.embed_tokens->data,
-                         cfg.hidden_size, ids, (size_t)n);
-            printf("embed [%d x %u]:", n, cfg.hidden_size);
-            for (uint32_t i = 0; i < cfg.hidden_size && i < 8; i++)
-                printf(" %.4f", emb[i]);
-            printf("\n");
-            if (verbose) {
-                cp_log_begin("embed");
-                cp_log_u("rows", (unsigned long long)n);
-                cp_log_u("dim", cfg.hidden_size);
-                cp_log_end();
-                for (int i = 0; i < n; i++) {
-                    cp_log_begin("vector");
-                    cp_log_u("index", (unsigned long long)i);
-                    cp_log_u("id", ids[i]);
-                    cp_log_u("dim", cfg.hidden_size);
-                    cp_log_v(emb + (size_t)i * cfg.hidden_size,
-                             cfg.hidden_size);
-                    cp_log_end();
+            if (use_gpu) {
+                printf("forward: %s\n",
+                       cp_forward_on_gpu(fw) ? "gpu" : "cpu (gpu init failed)");
+            }
+            const float *logits = NULL;
+            for (int i = 0; i < n; i++) {
+                logits = cp_forward_step(fw, ids[i], (size_t)i);
+            }
+            if (!logits) {
+                printf("Result: FAIL - forward prefill failed.\n");
+                cp_forward_free(fw);
+                free(ids);
+                cp_tok_free(tok);
+                cp_weights_free(&w);
+                st_free(f);
+                return 7;
+            }
+            uint32_t next = argmax(logits, cfg.vocab_size);
+            size_t pos = (size_t)n;
+            printf("reply: ");
+            for (int g = 0; g < max_new && logits; g++) {
+                if (next == cfg.eos_token_id || next == IM_END_ID) break;
+                char piece[64];
+                if (cp_tok_decode(tok, &next, 1, piece, sizeof piece) >= 0) {
+                    printf("%s", piece);
+                    fflush(stdout);
+                    if (verbose) {
+                        cp_log_begin("gen");
+                        cp_log_u("pos", (unsigned long long)pos);
+                        cp_log_u("id", next);
+                        cp_log_s("text", piece, strlen(piece));
+                        cp_log_end();
+                    }
                 }
+                logits = cp_forward_step(fw, next, pos++);
+                if (!logits) break;
+                next = argmax(logits, cfg.vocab_size);
             }
+            printf("\n");
+            cp_forward_free(fw);
         }
-        free(emb);
         free(ids);
         cp_tok_free(tok);
     }

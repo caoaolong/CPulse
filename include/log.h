@@ -27,8 +27,7 @@
  *   piece pretoken=.. index=.. text=".." id=..
  *   tokens count=..
  *   token index=.. id=.. text=".."
- *   embed rows=.. dim=..
- *   vector index=.. id=.. dim=.. values=..
+ *   gen pos=.. id=.. text=".."
  *
  * Logging stays completely off until cp_log_init() opens a file; every
  * call before that (or after cp_log_close()) is a cheap no-op, so call

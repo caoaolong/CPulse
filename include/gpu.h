@@ -23,6 +23,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "model.h"
+#include "weights.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,6 +47,30 @@ int gpu_ready(void);
  */
 int gpu_matvec(float *y, const uint16_t *W, const float *x,
                size_t rows, size_t cols);
+
+/* ------------------------------------------------------------------ */
+/* full decoder forward (weights + kv caches resident on device)      */
+
+/*
+ * Upload every weight once and allocate device-side kv caches and
+ * scratch. Calls gpu_init() first if needed. Returns 0 on success;
+ * on failure everything is freed and -1 comes back (caller falls back
+ * to the CPU path).
+ */
+int gpu_forward_init(const cp_config_t *cfg, const cp_weights_t *w);
+
+/* Release all device memory owned by the forward backend. */
+void gpu_forward_free(void);
+
+/*
+ * One token at absolute position pos through all layers on the GPU.
+ * Returns host logits [vocab_size] (module-owned, valid until the
+ * next call) or NULL on a device failure.
+ */
+const float *gpu_forward_step(uint32_t tok, size_t pos);
+
+/* Start a fresh sequence: kv write position restarts with pos=0. */
+void gpu_forward_reset(void);
 
 #ifdef __cplusplus
 }
