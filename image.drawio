@@ -1,4 +1,4 @@
-<mxfile host="draw.codingsoul.space" pages="2">
+<mxfile host="draw.codingsoul.space" pages="3">
   <diagram name="SafeTensors" id="NxQ6BMrmUrDz2awR1G7n">
     <mxGraphModel dx="808" dy="444" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -73,11 +73,26 @@
       </root>
     </mxGraphModel>
   </diagram>
-  <diagram id="_juePNwffk9IA_H7Jsqq" name="Processing">
-    <mxGraphModel dx="1298" dy="1428" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="1" shadow="0">
+  <diagram id="_juePNwffk9IA_H7Jsqq" name="TransformerEncoder">
+    <mxGraphModel dx="2369" dy="2019" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="1" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-20" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;dashed=1;arcSize=4;strokeWidth=4;strokeColor=#b85450;" value="" vertex="1">
+          <mxGeometry height="570" width="505" x="25" y="-260" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;dashed=1;arcSize=4;strokeWidth=4;strokeColor=#b85450;" value="" vertex="1">
+          <mxGeometry height="1365" width="540" x="10" y="505" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-28" edge="1" parent="1" source="FrkQxP3t67hAo6Va9DJp-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="FrkQxP3t67hAo6Va9DJp-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;dashed=1;arcSize=4;" value="" vertex="1">
+          <mxGeometry height="405" width="420" x="70" y="1450" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;arcSize=10;" value="" vertex="1">
+          <mxGeometry height="120" width="260" x="150" y="1640" as="geometry" />
+        </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-209" parent="1" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;" value="" vertex="1">
           <mxGeometry height="60" width="240" x="300" y="1040" as="geometry" />
         </mxCell>
@@ -895,49 +910,49 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="4uMYLpCEVd7LOkD6FoV_-146" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;fontColor=light-dark(#000000,#FFFF99);" value="$$\operatorname{RMS}(x)= \sqrt{\frac{1}{n}\sum_{k=1}^{n}x_k^2}$$" vertex="1">
-          <mxGeometry height="80" width="160" x="480" y="445" as="geometry" />
+          <mxGeometry height="80" width="160" x="560" y="445" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-7" edge="1" parent="1" source="AiAxmq6rZJVcfOl__ojC-4" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" target="AiAxmq6rZJVcfOl__ojC-6">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-4" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;fontColor=light-dark(#000000,#FFFF99);" value="$$\sigma = \sqrt{\sigma^2}$$" vertex="1">
-          <mxGeometry height="40" width="80" x="675" y="465" as="geometry" />
+          <mxGeometry height="40" width="80" x="755" y="465" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-11" edge="1" parent="1" source="AiAxmq6rZJVcfOl__ojC-6" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" target="AiAxmq6rZJVcfOl__ojC-10">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;fontColor=light-dark(#000000,#FFFF99);" value="$$\sigma^2&amp;nbsp;= \frac{(x_1-\mu)^2 + (x_2-\mu)^2 + \dots + (x_n-\mu)^2}{n}$$" vertex="1">
-          <mxGeometry height="60" width="300" x="790" y="455" as="geometry" />
+          <mxGeometry height="60" width="300" x="870" y="455" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-8" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;autosizeText=0;fontSize=12;fontFamily=吃我一记可爱杀 Regular;" value="标准差" vertex="1">
-          <mxGeometry height="30" width="110" x="660" y="425" as="geometry" />
+          <mxGeometry height="30" width="110" x="740" y="425" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-9" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;autosizeText=0;fontSize=12;fontFamily=吃我一记可爱杀 Regular;" value="方差" vertex="1">
-          <mxGeometry height="30" width="110" x="907" y="425" as="geometry" />
+          <mxGeometry height="30" width="110" x="987" y="425" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-10" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;fontColor=light-dark(#000000,#FFFF99);" value="$$\mu = \frac{x_1 + x_2 + \dots + x_n}{n}$$" vertex="1">
-          <mxGeometry height="60" width="160" x="1120" y="455" as="geometry" />
+          <mxGeometry height="60" width="160" x="1200" y="455" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-12" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;autosizeText=0;fontSize=12;fontFamily=吃我一记可爱杀 Regular;" value="平均数" vertex="1">
-          <mxGeometry height="30" width="110" x="1130" y="425" as="geometry" />
+          <mxGeometry height="30" width="110" x="1210" y="425" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-13" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;autosizeText=0;fontSize=12;fontFamily=吃我一记可爱杀 Regular;" value="把0当做平均数（&lt;b&gt;&lt;u&gt;只缩放，不平移&lt;/u&gt;&lt;/b&gt;）" vertex="1">
-          <mxGeometry height="30" width="240" x="360" y="420" as="geometry" />
+          <mxGeometry height="30" width="240" x="440" y="420" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-18" edge="1" parent="1" source="AiAxmq6rZJVcfOl__ojC-14" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" target="AiAxmq6rZJVcfOl__ojC-17">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-14" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;fontColor=light-dark(#000000,#FFFF99);" value="$$\operatorname{ReNorm}(x)_i = g_i \cdot \frac{x_i}{\sqrt{\text{scale}(x) + \varepsilon}}$$" vertex="1">
-          <mxGeometry height="80" width="220" x="480" y="605" as="geometry" />
+          <mxGeometry height="80" width="220" x="560" y="605" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-16" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=11;autosizeText=0;fontSize=12;fontFamily=吃我一记可爱杀 Regular;" value="重缩放归一化" vertex="1">
-          <mxGeometry height="30" width="110" x="480" y="685" as="geometry" />
+          <mxGeometry height="30" width="110" x="560" y="685" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;fontColor=light-dark(#000000,#FFFF99);" value="$$\operatorname{scale}(cx) = c^2 \cdot \text{scale}(x)$$" vertex="1">
-          <mxGeometry height="40" width="160" x="730" y="625" as="geometry" />
+          <mxGeometry height="40" width="160" x="810" y="625" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;dashed=1;strokeColor=light-dark(#000000,#FF9999);fontColor=light-dark(#000000,#FF9999);" value="$$\operatorname{RMS}=\sqrt{scale(x)}$$" vertex="1">
-          <mxGeometry height="40" width="130" x="510" y="545" as="geometry" />
+          <mxGeometry height="40" width="130" x="590" y="545" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-34" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=吃我一记可爱杀 Regular;fillColor=#d0cee2;strokeColor=#56517e;fontColor=default;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;$$\operatorname{RoPE}(x)$$&lt;/span&gt;&lt;/font&gt;" vertex="1">
           <mxGeometry height="30" width="260" x="80" y="780" as="geometry" />
@@ -946,7 +961,7 @@
           <mxGeometry height="30" width="80" x="60" y="690" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-38" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=12;fontColor=light-dark(#000000,#FFFF99);" value="$$b_q, b_k, b_v \in \mathbb{R}^{896 \times 1}$$" vertex="1">
-          <mxGeometry height="40" width="100" x="480" y="730" as="geometry" />
+          <mxGeometry height="40" width="100" x="560" y="730" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-39" parent="1" style="shape=table;startSize=0;container=1;collapsible=0;childLayout=tableLayout;fontSize=16;fillColor=#b1ddf0;strokeColor=#10739e;" value="" vertex="1">
           <mxGeometry height="60" width="60" x="120" y="840" as="geometry" />
@@ -1674,7 +1689,10 @@
         <mxCell id="AiAxmq6rZJVcfOl__ojC-254" edge="1" parent="1" source="AiAxmq6rZJVcfOl__ojC-252" style="edgeStyle=none;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" target="AiAxmq6rZJVcfOl__ojC-253">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="AiAxmq6rZJVcfOl__ojC-253" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=#0e8088;fillColor=#b0e3e6;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;" value="$$proj = W_o \cdot o + h, W_o \in \mathbb{R}^{896 \times 896}, h \in \mathbb{R}^{896 \times 1}$$" vertex="1">
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-2" edge="1" parent="1" source="AiAxmq6rZJVcfOl__ojC-253" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="FrkQxP3t67hAo6Va9DJp-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="AiAxmq6rZJVcfOl__ojC-253" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=#0e8088;fillColor=#b0e3e6;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;" value="$$proj_o = W_o \cdot o + h, W_o \in \mathbb{R}^{896 \times 896}, h \in \mathbb{R}^{896 \times 1}$$" vertex="1">
           <mxGeometry height="40" width="400" x="80" y="1460" as="geometry" />
         </mxCell>
         <mxCell id="AiAxmq6rZJVcfOl__ojC-255" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fillColor=#fad7ac;strokeColor=#b46504;" value="" vertex="1">
@@ -1728,6 +1746,68 @@
         <mxCell id="AiAxmq6rZJVcfOl__ojC-276" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=吃我一记可爱杀 Regular;fontColor=light-dark(#000000,#FFFF99);" value="cp_rmsnorm" vertex="1">
           <mxGeometry height="30" width="80" x="-160" y="545" as="geometry" />
         </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-4" edge="1" parent="1" source="FrkQxP3t67hAo6Va9DJp-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="FrkQxP3t67hAo6Va9DJp-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=吃我一记可爱杀 Regular;fillColor=#d0cee2;strokeColor=#56517e;fontColor=default;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;$$\operatorname{RMSNorm}(proj_o)$$&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="126" x="217" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-9" edge="1" parent="1" source="FrkQxP3t67hAo6Va9DJp-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="FrkQxP3t67hAo6Va9DJp-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=吃我一记可爱杀 Regular;fillColor=#d0cee2;strokeColor=#56517e;fontColor=default;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;$$\mathrm{gate} = W_{\mathrm{gate}}\, proj, \qquad \mathrm{up} = W_{\mathrm{up}}\, x$$&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="240" x="160" y="1590" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-5" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=12;autosizeText=0;fontSize=12;fontFamily=吃我一记可爱杀 Regular;" value="残差连接" vertex="1">
+          <mxGeometry height="30" width="80" x="400" y="1510" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-14" edge="1" parent="1" source="FrkQxP3t67hAo6Va9DJp-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="FrkQxP3t67hAo6Va9DJp-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=吃我一记可爱杀 Regular;fillColor=#d0cee2;strokeColor=#56517e;fontColor=default;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;$$y = \mathrm{SiLU}(g) = g \cdot \sigma(g) = \frac{g}{1+e^{-g}}$$&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="240" x="160" y="1710" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-10" edge="1" parent="1" source="FrkQxP3t67hAo6Va9DJp-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="FrkQxP3t67hAo6Va9DJp-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=吃我一记可爱杀 Regular;fillColor=#d0cee2;strokeColor=#56517e;fontColor=default;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;$$y_i = \mathrm{SiLU}(\mathrm{gate}_i)\cdot \mathrm{up}_i$$&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="160" x="200" y="1650" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-12" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=吃我一记可爱杀 Regular;" value="SwiGLU" vertex="1">
+          <mxGeometry height="30" width="60" x="340" y="1760" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-13" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=#0e8088;fillColor=#b0e3e6;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontSize=14;" value="$$proj_y = W_y \cdot y + h, W_y \in \mathbb{R}^{896 \times 896}, h \in \mathbb{R}^{896 \times 1}$$" vertex="1">
+          <mxGeometry height="40" width="400" x="80" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-16" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=吃我一记可爱杀 Regular;" value="Feed-Forward Network" vertex="1">
+          <mxGeometry height="30" width="140" x="70" y="1420" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-18" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=吃我一记可爱杀 Regular;fontSize=20;fontStyle=1;fontColor=light-dark(#000000,#FF9999);" value="Transformer Block" vertex="1">
+          <mxGeometry height="40" width="200" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-19" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;fillColor=#f8cecc;strokeColor=#b85450;fontFamily=Times New Roman;fontStyle=1;strokeWidth=4;fontSize=16;verticalAlign=middle;dashed=1;" value="Loop" vertex="1">
+          <mxGeometry height="80" width="80" x="520" y="1840" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-21" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=吃我一记可爱杀 Regular;fontSize=20;fontStyle=1;fontColor=light-dark(#000000,#FF9999);" value="Token Embedding" vertex="1">
+          <mxGeometry height="40" width="200" x="25" y="-300" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-27" edge="1" parent="1" source="FrkQxP3t67hAo6Va9DJp-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="FrkQxP3t67hAo6Va9DJp-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-24" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=吃我一记可爱杀 Regular;fillColor=#d0cee2;strokeColor=#56517e;fontColor=default;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;$$\operatorname{RMSNorm}(proj_y)$$&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="126" x="217" y="1900" as="geometry" />
+        </mxCell>
+        <mxCell id="FrkQxP3t67hAo6Va9DJp-25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=吃我一记可爱杀 Regular;fillColor=#d0cee2;strokeColor=#56517e;fontColor=default;" value="&lt;font face=&quot;Times New Roman&quot;&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;$$\mathrm{logits} = W_{\mathrm{lm}}\, x, \qquad \mathrm{logits}_v = \sum_{c=0}^{H-1} (W_{\mathrm{lm}})_{v,c}\, x_c$$&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="50" width="280" x="140" y="1960" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="gLqnBmjjhqdICb4cb6WR" name="TransformerDecoder">
+    <mxGraphModel dx="1542" dy="850" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
       </root>
     </mxGraphModel>
   </diagram>

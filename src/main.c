@@ -7,6 +7,8 @@
  * Startup: verify model files, load config + weights, bind tensors.
  * With --input <text>: greedy-generate a raw-text continuation (this
  * checkpoint is the Qwen2.5-0.5B base model: no chat template).
+ * Generation (prefill + decode) lives in generate.h; main only parses
+ * args and handles tokenize / print IO.
  * With --gpu: run the forward pass on CUDA (falls back to cpu).
  * With --token <t>: print the vocab id of one surface-form token.
  *
@@ -29,23 +31,34 @@
 #include "model.h"
 #include "weights.h"
 #include "tokenizer.h"
-#include "ops.h"
-#include "forward.h"
+#include "generate.h"
 #include "log.h"
 
 #define DEFAULT_MODEL_DIR ".cache/Qwen2.5-0.5B"
 #define ENGINE_NAME       "cpulse"
 #define ENGINE_VERSION    "0.3.0"
 #define DEFAULT_MAX_NEW    64
-#define IM_END_ID        151645u
 
-/* First-index-wins argmax over the logits row. */
-static uint32_t argmax(const float *v, uint32_t n) {
-    uint32_t best = 0;
-    for (uint32_t i = 1; i < n; i++) {
-        if (v[i] > v[best]) best = i;
+/* Streaming decode context for cp_generate's per-token callback. */
+typedef struct {
+    cp_tok_t *tok;
+    int       verbose;
+} gen_print_ctx_t;
+
+static void on_gen_token(uint32_t id, size_t pos, void *userdata) {
+    gen_print_ctx_t *ctx = (gen_print_ctx_t *)userdata;
+    char piece[64];
+    if (cp_tok_decode(ctx->tok, &id, 1, piece, sizeof piece) >= 0) {
+        printf("%s", piece);
+        fflush(stdout);
+        if (ctx->verbose) {
+            cp_log_begin("gen");
+            cp_log_u("pos", (unsigned long long)pos);
+            cp_log_u("id", id);
+            cp_log_s("text", piece, strlen(piece));
+            cp_log_end();
+        }
     }
-    return best;
 }
 
 /* Check that a required model file exists; silent on success,
@@ -360,10 +373,10 @@ int main(int argc, char **argv) {
             free(piece);
         }
         if (n > 0) {
-            /* ---- prefill + greedy decode (base model: raw continuation) ---- */
-            cp_forward_t *fw = NULL;
-            if (cp_forward_init(&fw, &cfg, &w, use_gpu) != 0) {
-                printf("Result: FAIL - forward init failed (see stderr).\n");
+            /* ---- prefill + greedy decode via session API ---- */
+            cp_session_t *sess = NULL;
+            if (cp_session_init(&sess, &cfg, &w, use_gpu) != 0) {
+                printf("Result: FAIL - session init failed (see stderr).\n");
                 free(ids);
                 cp_tok_free(tok);
                 cp_weights_free(&w);
@@ -372,44 +385,24 @@ int main(int argc, char **argv) {
             }
             if (use_gpu) {
                 printf("forward: %s\n",
-                       cp_forward_on_gpu(fw) ? "gpu" : "cpu (gpu init failed)");
+                       cp_session_on_gpu(sess) ? "gpu" : "cpu (gpu init failed)");
             }
-            const float *logits = NULL;
-            for (int i = 0; i < n; i++) {
-                logits = cp_forward_step(fw, ids[i], (size_t)i);
-            }
-            if (!logits) {
-                printf("Result: FAIL - forward prefill failed.\n");
-                cp_forward_free(fw);
+            gen_print_ctx_t pctx = { .tok = tok, .verbose = verbose };
+            printf("reply: ");
+            int n_gen = cp_generate(sess, ids, (size_t)n,
+                                    NULL, 0, max_new,
+                                    on_gen_token, &pctx);
+            printf("\n");
+            if (n_gen < 0) {
+                printf("Result: FAIL - generate failed (see stderr).\n");
+                cp_session_free(sess);
                 free(ids);
                 cp_tok_free(tok);
                 cp_weights_free(&w);
                 st_free(f);
                 return 7;
             }
-            uint32_t next = argmax(logits, cfg.vocab_size);
-            size_t pos = (size_t)n;
-            printf("reply: ");
-            for (int g = 0; g < max_new && logits; g++) {
-                if (next == cfg.eos_token_id || next == IM_END_ID) break;
-                char piece[64];
-                if (cp_tok_decode(tok, &next, 1, piece, sizeof piece) >= 0) {
-                    printf("%s", piece);
-                    fflush(stdout);
-                    if (verbose) {
-                        cp_log_begin("gen");
-                        cp_log_u("pos", (unsigned long long)pos);
-                        cp_log_u("id", next);
-                        cp_log_s("text", piece, strlen(piece));
-                        cp_log_end();
-                    }
-                }
-                logits = cp_forward_step(fw, next, pos++);
-                if (!logits) break;
-                next = argmax(logits, cfg.vocab_size);
-            }
-            printf("\n");
-            cp_forward_free(fw);
+            cp_session_free(sess);
         }
         free(ids);
         cp_tok_free(tok);
