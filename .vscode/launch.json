@@ -6,7 +6,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/debug/cpulse.exe",
-      "args": ["--input", "Hello,World!", "--verbose"],
+      "args": ["--gpu", "--input", "<|im_start|>Hello,World!", "--verbose"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],
