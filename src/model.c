@@ -63,6 +63,53 @@ static int get_str(const cJSON *obj, const char *key, char *dst, size_t cap) {
     return 1;
 }
 
+int cp_config_peek_model_type(const char *path, char *dst, size_t cap) {
+    if (!path || !dst || cap == 0) return -1;
+    dst[0] = '\0';
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        fprintf(stderr, "cp_config: cannot open '%s'\n", path);
+        return -1;
+    }
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (size <= 0) {
+        fprintf(stderr, "cp_config: '%s' is empty\n", path);
+        fclose(fp);
+        return -1;
+    }
+    char *buf = malloc((size_t)size + 1);
+    if (!buf) {
+        fclose(fp);
+        return -1;
+    }
+    if (fread(buf, 1, (size_t)size, fp) != (size_t)size) {
+        fprintf(stderr, "cp_config: short read on '%s'\n", path);
+        free(buf);
+        fclose(fp);
+        return -1;
+    }
+    fclose(fp);
+    buf[size] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root || !cJSON_IsObject(root)) {
+        fprintf(stderr, "cp_config: parse error in '%s'\n", path);
+        cJSON_Delete(root);
+        return -1;
+    }
+    if (!get_str(root, "model_type", dst, cap) || dst[0] == '\0') {
+        fprintf(stderr, "cp_config: missing required key 'model_type'\n");
+        cJSON_Delete(root);
+        return -1;
+    }
+    cJSON_Delete(root);
+    return 0;
+}
+
 static int cp_config_validate(cp_config_t *c, unsigned seen) {
     if (!(seen & REQ_MODEL_TYPE) || c->model_type[0] == '\0') {
         fprintf(stderr, "cp_config: missing required key 'model_type'\n");
@@ -76,6 +123,14 @@ static int cp_config_validate(cp_config_t *c, unsigned seen) {
         return -1;
     }
     c->arch = arch->id;
+
+    if (arch->id == CP_ARCH_ENCODER_DECODER) {
+        fprintf(stderr,
+                "cp_config: model_type='%s' is encoder-decoder; "
+                "use cp_t5_config_load instead\n",
+                c->model_type);
+        return -1;
+    }
 
     if (!arch->implemented) {
         fprintf(stderr,

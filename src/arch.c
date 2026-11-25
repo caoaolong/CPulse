@@ -27,8 +27,10 @@ static const cp_arch_t k_encoder_only = {
 static const cp_arch_t k_decoder_only = {
     CP_ARCH_DECODER_ONLY, "decoder-only", "decoder-only", 1
 };
+/* implemented=1: strategy gate open; runtime only admits T5-family via
+ * cp_t5_config_load (see command.c). Other Enc–Dec model_types still fail. */
 static const cp_arch_t k_encoder_decoder = {
-    CP_ARCH_ENCODER_DECODER, "encoder-decoder", "encoder-decoder", 0
+    CP_ARCH_ENCODER_DECODER, "encoder-decoder", "encoder-decoder", 1
 };
 
 static void str_list_free(str_list_t *L) {

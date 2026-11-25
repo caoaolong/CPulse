@@ -10,6 +10,8 @@
 #include "generate.h"
 #include "model.h"
 #include "safetensors.h"
+#include "t5_config.h"
+#include "t5_tokenizer.h"
 #include "tokenizer.h"
 #include "weights.h"
 
@@ -18,6 +20,8 @@
 #include <string.h>
 
 /* ---- small helpers ------------------------------------------------ */
+
+static int resolve_t5_tok_backend(const cp_cli_t *cli, cp_t5_tok_backend_t *out);
 
 static int file_exists(const char *base, const char *name) {
     char path[512];
@@ -86,13 +90,115 @@ static void model_bundle_free(model_bundle_t *m) {
  * On failure prints Result line and returns process exit code (>0).
  * On success returns 0; caller must model_bundle_free().
  */
-static int load_model(model_bundle_t *m, const char *model_dir) {
+static void print_st_summary(const st_file_t *st) {
+    uint64_t total_params = 0, total_bytes = 0;
+    for (size_t i = 0; i < st->n_tensors; i++) {
+        uint64_t prod = 1;
+        for (size_t d = 0; d < st->tensors[i].ndim; d++)
+            prod *= st->tensors[i].shape[d];
+        total_params += prod;
+        total_bytes += st->tensors[i].nbytes;
+    }
+    printf("weights: %zu tensors, %.1fM params, %.1f MB\n",
+           st->n_tensors, total_params / 1.0e6,
+           total_bytes / (1024.0 * 1024.0));
+}
+
+/*
+ * Encoder-decoder / T5 path: parse dedicated config, open safetensors for
+ * visibility, then stop before Qwen weight binding.
+ */
+static int load_model_t5(model_bundle_t *m, const char *model_dir,
+                         const char *config_path, const cp_cli_t *cli) {
+    cp_t5_config_t t5;
+    if (cp_t5_config_load(config_path, &t5) != 0) {
+        printf("Result: FAIL - T5 config loading failed (see stderr).\n");
+        return 3;
+    }
+    printf("arch: %s (%s) vocab=%u d_model=%u d_ff=%u layers=%u/%u heads=%u\n",
+           t5.model_type, cp_arch_name(t5.arch), t5.vocab_size, t5.d_model,
+           t5.d_ff, t5.num_layers, t5.num_decoder_layers, t5.num_heads);
+    cp_t5_config_print(&t5);
+
+    cp_t5_tok_backend_t backend;
+    if (resolve_t5_tok_backend(cli, &backend) != 0) return 1;
+    cp_t5_tok_t *tok = NULL;
+    if (cp_t5_tok_load(&tok, model_dir, backend) != 0) {
+        printf("Result: FAIL - T5 tokenizer loading failed (see stderr).\n");
+        return 6;
+    }
+    {
+        static const char *sample = "translate English to German: Hello";
+        uint32_t ids[64];
+        int n = cp_t5_tok_encode(tok, sample, ids, 64, 1);
+        printf("t5_tok: backend=%s vocab=%zu sample \"%s\" ->",
+               cp_t5_tok_backend_name(backend), cp_t5_tok_vocab_size(tok),
+               sample);
+        if (n < 0) {
+            printf(" <encode failed>\n");
+            cp_t5_tok_free(tok);
+            printf("Result: FAIL - T5 tokenization failed (see stderr).\n");
+            return 6;
+        }
+        for (int i = 0; i < n; i++) printf(" %u", ids[i]);
+        printf("\n");
+    }
+    cp_t5_tok_free(tok);
+
+    char weights_path[512];
+    snprintf(weights_path, sizeof(weights_path), "%s/model.safetensors",
+             model_dir);
+    m->st = st_load(weights_path);
+    if (!m->st) {
+        printf("Result: FAIL - safetensors parsing failed (see stderr).\n");
+        return 4;
+    }
+    print_st_summary(m->st);
+
+    fprintf(stderr,
+            "cp_t5: weight binding not implemented yet "
+            "(T5 config + tokenizer OK; next step is bind)\n");
+    printf("Result: FAIL - T5 weight binding not implemented yet.\n");
+    st_free(m->st);
+    m->st = NULL;
+    return 5;
+}
+
+static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
+    const char *model_dir = cli->model_dir;
     memset(m, 0, sizeof(*m));
 
     if (check_model_files(model_dir) != 0) return 2;
 
     char config_path[512];
     snprintf(config_path, sizeof(config_path), "%s/config.json", model_dir);
+
+    char model_type[32];
+    if (cp_config_peek_model_type(config_path, model_type,
+                                  sizeof model_type) != 0) {
+        printf("Result: FAIL - config loading failed (see stderr).\n");
+        return 3;
+    }
+    const cp_arch_t *arch = cp_arch_resolve(model_type);
+    if (!arch) {
+        fprintf(stderr, "cp_config: unknown model_type '%s'\n", model_type);
+        cp_arch_print_registry(stderr);
+        printf("Result: FAIL - config loading failed (see stderr).\n");
+        return 3;
+    }
+    if (!arch->implemented) {
+        fprintf(stderr,
+                "cp_config: strategy '%s' recognized from model_type='%s', "
+                "but not implemented yet\n",
+                arch->name, model_type);
+        printf("Result: FAIL - config loading failed (see stderr).\n");
+        return 3;
+    }
+
+    /* Strategy open for Enc–Dec, but only the T5-family loader is wired. */
+    if (arch->id == CP_ARCH_ENCODER_DECODER)
+        return load_model_t5(m, model_dir, config_path, cli);
+
     if (cp_config_load(config_path, &m->cfg) != 0) {
         printf("Result: FAIL - config loading failed (see stderr).\n");
         return 3;
@@ -109,20 +215,7 @@ static int load_model(model_bundle_t *m, const char *model_dir) {
         printf("Result: FAIL - safetensors parsing failed (see stderr).\n");
         return 4;
     }
-
-    {
-        uint64_t total_params = 0, total_bytes = 0;
-        for (size_t i = 0; i < m->st->n_tensors; i++) {
-            uint64_t prod = 1;
-            for (size_t d = 0; d < m->st->tensors[i].ndim; d++)
-                prod *= m->st->tensors[i].shape[d];
-            total_params += prod;
-            total_bytes += m->st->tensors[i].nbytes;
-        }
-        printf("weights: %zu tensors, %.1fM params, %.1f MB\n",
-               m->st->n_tensors, total_params / 1.0e6,
-               total_bytes / (1024.0 * 1024.0));
-    }
+    print_st_summary(m->st);
 
     if (cp_weights_bind(&m->cfg, m->st, &m->w) != 0) {
         printf("Result: FAIL - weight binding failed (see stderr).\n");
@@ -139,18 +232,85 @@ static int load_model(model_bundle_t *m, const char *model_dir) {
 
 void cp_cmd_help(const char *prog) {
     printf("Usage: %s [--model <model_dir>] [--arch-config <path>] "
-           "[--input <text>] [--token <token>] [--max-new <n>] [--gpu]\n", prog);
+           "[--input <text>] [--token <token>] [--tok-backend json|spiece] "
+           "[--max-new <n>] [--gpu]\n", prog);
     printf("  --model <model_dir>       path to the model directory\n");
     printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
     printf("  --arch-config <path>      model_type -> strategy routes JSON\n");
     printf("                            (default: %s)\n", CP_DEFAULT_ARCH_CONFIG);
     printf("  --input <text>            greedy-generate a continuation of <text>\n");
     printf("  --token <token>           print the vocab id of one surface-form token\n");
+    printf("  --tok-backend <name>      T5 tokenizer: json (default) or spiece\n");
     printf("  --max-new <n>             tokens to generate (default %d)\n", CP_DEFAULT_MAX_NEW);
     printf("  --gpu                     run the forward pass on CUDA (falls back to cpu)\n");
 }
 
+static int resolve_t5_tok_backend(const cp_cli_t *cli, cp_t5_tok_backend_t *out) {
+    *out = CP_T5_TOK_JSON;
+    if (!cli || !out) return -1;
+    if (!cli->tok_backend || cli->tok_backend[0] == '\0') return 0;
+    if (cp_t5_tok_backend_parse(cli->tok_backend, out) != 0) {
+        fprintf(stderr, "cpulse: unknown --tok-backend '%s' "
+                "(want json or spiece)\n", cli->tok_backend);
+        return -1;
+    }
+    return 0;
+}
+
+static int is_t5_model_dir(const char *model_dir) {
+    char path[512];
+    char mt[32];
+    snprintf(path, sizeof path, "%s/config.json", model_dir);
+    if (cp_config_peek_model_type(path, mt, sizeof mt) != 0) return 0;
+    return strcmp(mt, "t5") == 0 || strcmp(mt, "mt5") == 0 ||
+           strcmp(mt, "flan-t5") == 0;
+}
+
+static int cmd_token_t5(const cp_cli_t *cli) {
+    cp_t5_tok_backend_t backend;
+    if (resolve_t5_tok_backend(cli, &backend) != 0) return 1;
+
+    cp_t5_tok_t *tok = NULL;
+    if (cp_t5_tok_load(&tok, cli->model_dir, backend) != 0) {
+        printf("Result: FAIL - T5 tokenizer loading failed (see stderr).\n");
+        return 6;
+    }
+    printf("t5_tok: backend=%s vocab=%zu pad=%u eos=%u unk=%u\n",
+           cp_t5_tok_backend_name(cp_t5_tok_backend(tok)),
+           cp_t5_tok_vocab_size(tok), cp_t5_tok_pad_id(tok),
+           cp_t5_tok_eos_id(tok), cp_t5_tok_unk_id(tok));
+
+    size_t cap = strlen(cli->token_text) * 4 + 16;
+    uint32_t *ids = malloc(cap * sizeof *ids);
+    if (!ids) {
+        printf("Result: FAIL - out of memory.\n");
+        cp_t5_tok_free(tok);
+        return 6;
+    }
+    int n = cp_t5_tok_encode(tok, cli->token_text, ids, cap, 1);
+    if (n < 0) {
+        printf("Result: FAIL - T5 tokenization failed (see stderr).\n");
+        free(ids);
+        cp_t5_tok_free(tok);
+        return 6;
+    }
+    printf("encode \"%s\" ->", cli->token_text);
+    for (int i = 0; i < n; i++) printf(" %u", ids[i]);
+    printf("\n");
+
+    char dec[1024];
+    if (cp_t5_tok_decode(tok, ids, (size_t)n, dec, sizeof dec, 1) >= 0)
+        printf("decode(skip_special): \"%s\"\n", dec);
+
+    free(ids);
+    cp_t5_tok_free(tok);
+    return 0;
+}
+
 static int cmd_token(const cp_cli_t *cli) {
+    if (is_t5_model_dir(cli->model_dir))
+        return cmd_token_t5(cli);
+
     cp_tok_t *tok = NULL;
     if (cp_tok_load(&tok, cli->model_dir) != 0) {
         printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
@@ -186,7 +346,7 @@ static int cmd_token(const cp_cli_t *cli) {
 
 static int cmd_summary(const cp_cli_t *cli) {
     model_bundle_t m;
-    int rc = load_model(&m, cli->model_dir);
+    int rc = load_model(&m, cli);
     if (rc != 0) return rc;
     model_bundle_free(&m);
     printf("OK\n");
@@ -195,7 +355,7 @@ static int cmd_summary(const cp_cli_t *cli) {
 
 static int cmd_generate(const cp_cli_t *cli) {
     model_bundle_t m;
-    int rc = load_model(&m, cli->model_dir);
+    int rc = load_model(&m, cli);
     if (rc != 0) return rc;
 
     printf("input: %s\n", cli->input_text);

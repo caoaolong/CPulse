@@ -7,8 +7,8 @@
  * Holds the architecture hyperparameters parsed from the model's
  * config.json, plus the derived values the forward pass needs
  * (strategy id, head_dim, kv repeat factor). Validation maps model_type
- * through arch_routes.json; stub strategies fail early, implemented
- * ones get full shape / activation checks.
+ * through arch_routes.json. Decoder-only (Qwen) is validated here;
+ * encoder-decoder (T5) uses cp_t5_config_load instead.
  */
 
 #ifndef MODEL_H
@@ -16,6 +16,7 @@
 
 #include "arch.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -47,8 +48,15 @@ typedef struct {
 } cp_config_t;
 
 /*
- * Load config.json from disk. Returns 0 on success (including
- * validation); on failure prints a diagnostic to stderr and returns -1.
+ * Read only model_type from config.json (no full validation).
+ * Returns 0 on success; on failure prints to stderr and returns -1.
+ */
+int cp_config_peek_model_type(const char *path, char *dst, size_t cap);
+
+/*
+ * Load decoder-only (Qwen-style) config.json. Returns 0 on success
+ * (including validation); on failure prints a diagnostic to stderr
+ * and returns -1. Encoder-decoder configs must use cp_t5_config_load.
  */
 int cp_config_load(const char *path, cp_config_t *out);
 

@@ -3,7 +3,7 @@
  *
  * model_type is mapped to one of three strategies via a JSON route file
  * (default: arch_routes.json). Implementation availability is decided
- * in code (currently only decoder-only can run).
+ * in code: decoder-only (Qwen) and encoder-decoder (T5 config path).
  */
 
 #ifndef ARCH_H
