@@ -34,7 +34,7 @@ translate English to German: How are you?
 | Norm | RMSNorm | LayerNorm（`layer_norm_epsilon`） |
 | FFN | SwiGLU | DenseReluDense（`wi` / `wo`，ReLU） |
 | 注意力 | 仅因果 Self-Attn | Enc 双向 Self；Dec 因果 Self + Cross（EncDecAttention） |
-| 词表 | BPE（`vocab.json` + `merges.txt`） | SentencePiece（`spiece.model`）/ `tokenizer.json` |
+| 词表 | BPE（`vocab.json` + `merges.txt`） | Unigram（`tokenizer.json`） |
 | 推理节奏 | 单塔 prefill + decode | 先 encode 全文，再 decode 逐步生成 |
 | 权重前缀 | `model.layers.*` | `shared` / `encoder.block.*` / `decoder.block.*` |
 | 权重 dtype | BF16 | 以实际 safetensors 为准（勿写死 BF16） |
@@ -96,10 +96,7 @@ src/t5/
 
 ### 步骤 2 — Tokenizer
 
-优先：
-
-1. 解析 `spiece.model`（推荐，与官方一致）
-2. 或使用 `tokenizer.json`（若实现成本更低）
+使用通用的 `tokenizer.json`（Unigram + HF fast 词表），不再解析 `spiece.model`。
 
 需要：`encode`、`decode`，以及 `pad` / `eos` / `decoder_start_token_id`。
 

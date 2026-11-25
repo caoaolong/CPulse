@@ -1,13 +1,10 @@
 /*
  * t5_tokenizer.c - T5 Unigram tokenizer (see t5_tokenizer.h)
  *
- * Shared encode path for both backends:
+ * Loads model.vocab from tokenizer.json, then:
  *   1) space -> U+2581 (▁); optional dummy prefix ▁
  *   2) Unigram Viterbi over UTF-8 (SentencePiece EncodeOptimized style)
  *   3) optional eos append
- *
- * JSON backend reads model.vocab from tokenizer.json.
- * SPIECE backend parses SentencePiece ModelProto pieces from spiece.model.
  */
 
 #include "t5_tokenizer.h"
@@ -128,7 +125,6 @@ static void u_map_free(u_map_t *m) {
 /* ---------------- tokenizer state ---------------- */
 
 struct cp_t5_tok {
-    cp_t5_tok_backend_t backend;
     u_map_t   piece_to_id; /* piece bytes -> id+score */
     char    **id_to_piece; /* owned strings; may be NULL slots */
     size_t    n_ids;
@@ -298,205 +294,6 @@ static int load_from_json(cp_t5_tok_t *t, const char *path) {
     return 0;
 }
 
-/* ---------------- SPIECE protobuf backend ---------------- */
-
-static int pb_read_varint(const uint8_t **pp, const uint8_t *end,
-                          uint64_t *out) {
-    const uint8_t *p = *pp;
-    uint64_t v = 0;
-    int shift = 0;
-    while (p < end && shift < 64) {
-        uint8_t b = *p++;
-        v |= (uint64_t)(b & 0x7f) << shift;
-        if ((b & 0x80) == 0) {
-            *pp = p;
-            *out = v;
-            return 0;
-        }
-        shift += 7;
-    }
-    return -1;
-}
-
-static int pb_skip(const uint8_t **pp, const uint8_t *end, uint32_t wt) {
-    const uint8_t *p = *pp;
-    if (wt == 0) { /* varint */
-        uint64_t v;
-        if (pb_read_varint(&p, end, &v) != 0) return -1;
-    } else if (wt == 1) { /* 64-bit */
-        if (p + 8 > end) return -1;
-        p += 8;
-    } else if (wt == 2) { /* length-delimited */
-        uint64_t len;
-        if (pb_read_varint(&p, end, &len) != 0) return -1;
-        if (p + len > end) return -1;
-        p += (size_t)len;
-    } else if (wt == 5) { /* 32-bit */
-        if (p + 4 > end) return -1;
-        p += 4;
-    } else {
-        return -1;
-    }
-    *pp = p;
-    return 0;
-}
-
-static int pb_parse_piece(cp_t5_tok_t *t, const uint8_t *p, const uint8_t *end,
-                          uint32_t id) {
-    const char *piece = NULL;
-    size_t plen = 0;
-    float score = 0.0f;
-    int have_score = 0;
-
-    while (p < end) {
-        uint64_t tag;
-        if (pb_read_varint(&p, end, &tag) != 0) return -1;
-        uint32_t field = (uint32_t)(tag >> 3);
-        uint32_t wt = (uint32_t)(tag & 7);
-        if (field == 1 && wt == 2) { /* piece string */
-            uint64_t len;
-            if (pb_read_varint(&p, end, &len) != 0) return -1;
-            if (p + len > end) return -1;
-            piece = (const char *)p;
-            plen = (size_t)len;
-            p += (size_t)len;
-        } else if (field == 2 && wt == 5) { /* score float */
-            if (p + 4 > end) return -1;
-            memcpy(&score, p, 4);
-            have_score = 1;
-            p += 4;
-        } else if (field == 3 && wt == 0) { /* type enum — ignore */
-            uint64_t v;
-            if (pb_read_varint(&p, end, &v) != 0) return -1;
-            (void)v;
-        } else {
-            if (pb_skip(&p, end, wt) != 0) return -1;
-        }
-    }
-
-    if (!piece || plen == 0) return 0; /* empty piece: skip */
-    if (!have_score) score = 0.0f;
-    return add_piece(t, piece, plen, id, score);
-}
-
-static int load_from_spiece(cp_t5_tok_t *t, const char *path) {
-    char *buf = NULL;
-    size_t n = 0;
-    if (read_file(path, &buf, &n) != 0) return -1;
-
-    /* First pass: count pieces for map sizing. */
-    size_t n_pieces = 0;
-    {
-        const uint8_t *p = (const uint8_t *)buf;
-        const uint8_t *end = p + n;
-        while (p < end) {
-            uint64_t tag;
-            if (pb_read_varint(&p, end, &tag) != 0) break;
-            uint32_t field = (uint32_t)(tag >> 3);
-            uint32_t wt = (uint32_t)(tag & 7);
-            if (field == 1 && wt == 2) {
-                uint64_t len;
-                if (pb_read_varint(&p, end, &len) != 0) break;
-                if (p + len > end) break;
-                p += (size_t)len;
-                n_pieces++;
-            } else {
-                if (pb_skip(&p, end, wt) != 0) break;
-            }
-        }
-    }
-
-    if (n_pieces == 0) {
-        fprintf(stderr, "t5_tok: no pieces in '%s'\n", path);
-        free(buf);
-        return -1;
-    }
-    if (u_map_init(&t->piece_to_id, n_pieces * 2 + 16) != 0) {
-        free(buf);
-        return -1;
-    }
-    t->min_score = FLT_MAX;
-
-    const uint8_t *p = (const uint8_t *)buf;
-    const uint8_t *end = p + n;
-    uint32_t id = 0;
-    while (p < end) {
-        uint64_t tag;
-        if (pb_read_varint(&p, end, &tag) != 0) {
-            fprintf(stderr, "t5_tok: protobuf parse error in '%s'\n", path);
-            free(buf);
-            return -1;
-        }
-        uint32_t field = (uint32_t)(tag >> 3);
-        uint32_t wt = (uint32_t)(tag & 7);
-        if (field == 1 && wt == 2) {
-            uint64_t len;
-            if (pb_read_varint(&p, end, &len) != 0 || p + len > end) {
-                fprintf(stderr, "t5_tok: protobuf parse error in '%s'\n", path);
-                free(buf);
-                return -1;
-            }
-            if (pb_parse_piece(t, p, p + (size_t)len, id) != 0) {
-                fprintf(stderr, "t5_tok: failed to load piece %u\n", id);
-                free(buf);
-                return -1;
-            }
-            p += (size_t)len;
-            id++;
-        } else {
-            if (pb_skip(&p, end, wt) != 0) {
-                fprintf(stderr, "t5_tok: protobuf parse error in '%s'\n", path);
-                free(buf);
-                return -1;
-            }
-        }
-    }
-    free(buf);
-
-    /* Conventional T5 / SPM special ids. */
-    t->pad_id = 0;
-    t->eos_id = 1;
-    t->unk_id = 2;
-    if (t->min_score == FLT_MAX) t->min_score = 0.0f;
-    return 0;
-}
-
-/*
- * HF T5Tokenizer appends <extra_id_{N-1}> .. <extra_id_0> after the SPM
- * pieces (default N=100). tokenizer.json already embeds them; for the
- * spiece backend we mirror that from tokenizer_config.json when present.
- */
-static int append_extra_ids(cp_t5_tok_t *t, const char *model_dir) {
-    char path[512];
-    snprintf(path, sizeof path, "%s/tokenizer_config.json", model_dir);
-
-    int extra_ids = 100;
-    char *buf = NULL;
-    size_t n = 0;
-    if (read_file(path, &buf, &n) == 0) {
-        cJSON *root = cJSON_ParseWithLength(buf, n);
-        free(buf);
-        if (root && cJSON_IsObject(root)) {
-            const cJSON *ex =
-                cJSON_GetObjectItemCaseSensitive(root, "extra_ids");
-            if (cJSON_IsNumber(ex) && ex->valuedouble >= 0)
-                extra_ids = (int)ex->valuedouble;
-        }
-        cJSON_Delete(root);
-    }
-
-    uint32_t next_id = (uint32_t)t->n_ids;
-    for (int i = 0; i < extra_ids; i++) {
-        char piece[32];
-        /* HF order: extra_id_{N-1} first, then down to extra_id_0. */
-        snprintf(piece, sizeof piece, "<extra_id_%d>", extra_ids - 1 - i);
-        if (add_piece(t, piece, strlen(piece), next_id, 0.0f) != 0)
-            return -1;
-        next_id++;
-    }
-    return 0;
-}
-
 /* ---------------- encode / decode ---------------- */
 
 /*
@@ -634,28 +431,6 @@ static int unigram_encode(const cp_t5_tok_t *t, const char *s, size_t n,
 
 /* ---------------- public API ---------------- */
 
-const char *cp_t5_tok_backend_name(cp_t5_tok_backend_t b) {
-    switch (b) {
-    case CP_T5_TOK_JSON: return "json";
-    case CP_T5_TOK_SPIECE: return "spiece";
-    default: return "unknown";
-    }
-}
-
-int cp_t5_tok_backend_parse(const char *s, cp_t5_tok_backend_t *out) {
-    if (!s || !out) return -1;
-    if (strcmp(s, "json") == 0 || strcmp(s, "tokenizer.json") == 0) {
-        *out = CP_T5_TOK_JSON;
-        return 0;
-    }
-    if (strcmp(s, "spiece") == 0 || strcmp(s, "spiece.model") == 0 ||
-        strcmp(s, "spm") == 0) {
-        *out = CP_T5_TOK_SPIECE;
-        return 0;
-    }
-    return -1;
-}
-
 void cp_t5_tok_free(cp_t5_tok_t *t) {
     if (!t) return;
     u_map_free(&t->piece_to_id);
@@ -666,14 +441,12 @@ void cp_t5_tok_free(cp_t5_tok_t *t) {
     free(t);
 }
 
-int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir,
-                   cp_t5_tok_backend_t backend) {
+int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir) {
     if (!out || !model_dir) return -1;
     *out = NULL;
 
     cp_t5_tok_t *t = calloc(1, sizeof *t);
     if (!t) return -1;
-    t->backend = backend;
     t->pad_id = 0;
     t->eos_id = 1;
     t->unk_id = 2;
@@ -681,20 +454,8 @@ int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir,
     t->min_score = 0.0f;
 
     char path[512];
-    int rc;
-    if (backend == CP_T5_TOK_JSON) {
-        snprintf(path, sizeof path, "%s/tokenizer.json", model_dir);
-        rc = load_from_json(t, path);
-    } else if (backend == CP_T5_TOK_SPIECE) {
-        snprintf(path, sizeof path, "%s/spiece.model", model_dir);
-        rc = load_from_spiece(t, path);
-        if (rc == 0) rc = append_extra_ids(t, model_dir);
-    } else {
-        fprintf(stderr, "t5_tok: unknown backend %d\n", (int)backend);
-        rc = -1;
-    }
-
-    if (rc != 0) {
+    snprintf(path, sizeof path, "%s/tokenizer.json", model_dir);
+    if (load_from_json(t, path) != 0) {
         cp_t5_tok_free(t);
         return -1;
     }
@@ -702,9 +463,6 @@ int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir,
     return 0;
 }
 
-cp_t5_tok_backend_t cp_t5_tok_backend(const cp_t5_tok_t *t) {
-    return t ? t->backend : CP_T5_TOK_JSON;
-}
 uint32_t cp_t5_tok_pad_id(const cp_t5_tok_t *t) { return t ? t->pad_id : 0; }
 uint32_t cp_t5_tok_eos_id(const cp_t5_tok_t *t) { return t ? t->eos_id : 1; }
 uint32_t cp_t5_tok_unk_id(const cp_t5_tok_t *t) { return t ? t->unk_id : 2; }

@@ -33,7 +33,6 @@ int main(int argc, char **argv) {
         .arch_config = NULL,
         .input_text  = NULL,
         .token_text  = NULL,
-        .tok_backend = NULL,
         .max_new     = CP_DEFAULT_MAX_NEW,
         .use_gpu     = 0,
     };
@@ -74,13 +73,6 @@ int main(int argc, char **argv) {
             if (cli.max_new <= 0) cli.max_new = CP_DEFAULT_MAX_NEW;
         } else if (strcmp(argv[i], "--gpu") == 0) {
             cli.use_gpu = 1;
-        } else if (strcmp(argv[i], "--tok-backend") == 0) {
-            if (i + 1 >= argc) {
-                fprintf(stderr, "missing value for --tok-backend\n");
-                cp_cmd_help(argv[0]);
-                return 1;
-            }
-            cli.tok_backend = argv[++i];
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             cp_cmd_help(argv[0]);
             return 0;

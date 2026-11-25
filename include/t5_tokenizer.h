@@ -1,8 +1,5 @@
 /*
- * t5_tokenizer.h - T5 Unigram tokenizer (tokenizer.json / spiece.model)
- *
- * Default backend is tokenizer.json (HF fast). spiece.model is also
- * supported and should yield the same ids for ASCII inputs.
+ * t5_tokenizer.h - T5 Unigram tokenizer via tokenizer.json
  */
 
 #ifndef T5_TOKENIZER_H
@@ -15,25 +12,17 @@
 extern "C" {
 #endif
 
-typedef enum {
-    CP_T5_TOK_JSON = 0,   /* default: <model_dir>/tokenizer.json */
-    CP_T5_TOK_SPIECE = 1  /* <model_dir>/spiece.model */
-} cp_t5_tok_backend_t;
-
 typedef struct cp_t5_tok cp_t5_tok_t;
 
 /*
- * Load T5 tokenizer from model_dir using the chosen backend.
+ * Load T5 tokenizer from <model_dir>/tokenizer.json.
  * On success *out is owned by the caller (cp_t5_tok_free); on failure
  * prints to stderr and returns -1.
  */
-int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir,
-                   cp_t5_tok_backend_t backend);
+int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir);
 
 void cp_t5_tok_free(cp_t5_tok_t *t);
 
-/* Backend / special-id accessors. */
-cp_t5_tok_backend_t cp_t5_tok_backend(const cp_t5_tok_t *t);
 uint32_t cp_t5_tok_pad_id(const cp_t5_tok_t *t);
 uint32_t cp_t5_tok_eos_id(const cp_t5_tok_t *t);
 uint32_t cp_t5_tok_unk_id(const cp_t5_tok_t *t);
@@ -54,11 +43,6 @@ int cp_t5_tok_encode(const cp_t5_tok_t *t, const char *text,
  */
 int cp_t5_tok_decode(const cp_t5_tok_t *t, const uint32_t *ids, size_t n,
                      char *out, size_t cap, int skip_special);
-
-/* Parse "json" / "spiece" (case-insensitive). Returns 0 on success. */
-int cp_t5_tok_backend_parse(const char *s, cp_t5_tok_backend_t *out);
-
-const char *cp_t5_tok_backend_name(cp_t5_tok_backend_t b);
 
 #ifdef __cplusplus
 }

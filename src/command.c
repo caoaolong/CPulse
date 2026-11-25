@@ -21,8 +21,6 @@
 
 /* ---- small helpers ------------------------------------------------ */
 
-static int resolve_t5_tok_backend(const cp_cli_t *cli, cp_t5_tok_backend_t *out);
-
 static int file_exists(const char *base, const char *name) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s", base, name);
@@ -120,10 +118,9 @@ static int load_model_t5(model_bundle_t *m, const char *model_dir,
            t5.d_ff, t5.num_layers, t5.num_decoder_layers, t5.num_heads);
     cp_t5_config_print(&t5);
 
-    cp_t5_tok_backend_t backend;
-    if (resolve_t5_tok_backend(cli, &backend) != 0) return 1;
+    (void)cli;
     cp_t5_tok_t *tok = NULL;
-    if (cp_t5_tok_load(&tok, model_dir, backend) != 0) {
+    if (cp_t5_tok_load(&tok, model_dir) != 0) {
         printf("Result: FAIL - T5 tokenizer loading failed (see stderr).\n");
         return 6;
     }
@@ -131,9 +128,8 @@ static int load_model_t5(model_bundle_t *m, const char *model_dir,
         static const char *sample = "translate English to German: Hello";
         uint32_t ids[64];
         int n = cp_t5_tok_encode(tok, sample, ids, 64, 1);
-        printf("t5_tok: backend=%s vocab=%zu sample \"%s\" ->",
-               cp_t5_tok_backend_name(backend), cp_t5_tok_vocab_size(tok),
-               sample);
+        printf("t5_tok: vocab=%zu sample \"%s\" ->",
+               cp_t5_tok_vocab_size(tok), sample);
         if (n < 0) {
             printf(" <encode failed>\n");
             cp_t5_tok_free(tok);
@@ -232,29 +228,15 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
 
 void cp_cmd_help(const char *prog) {
     printf("Usage: %s [--model <model_dir>] [--arch-config <path>] "
-           "[--input <text>] [--token <token>] [--tok-backend json|spiece] "
-           "[--max-new <n>] [--gpu]\n", prog);
+           "[--input <text>] [--token <token>] [--max-new <n>] [--gpu]\n", prog);
     printf("  --model <model_dir>       path to the model directory\n");
     printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
     printf("  --arch-config <path>      model_type -> strategy routes JSON\n");
     printf("                            (default: %s)\n", CP_DEFAULT_ARCH_CONFIG);
     printf("  --input <text>            greedy-generate a continuation of <text>\n");
     printf("  --token <token>           print the vocab id of one surface-form token\n");
-    printf("  --tok-backend <name>      T5 tokenizer: json (default) or spiece\n");
     printf("  --max-new <n>             tokens to generate (default %d)\n", CP_DEFAULT_MAX_NEW);
     printf("  --gpu                     run the forward pass on CUDA (falls back to cpu)\n");
-}
-
-static int resolve_t5_tok_backend(const cp_cli_t *cli, cp_t5_tok_backend_t *out) {
-    *out = CP_T5_TOK_JSON;
-    if (!cli || !out) return -1;
-    if (!cli->tok_backend || cli->tok_backend[0] == '\0') return 0;
-    if (cp_t5_tok_backend_parse(cli->tok_backend, out) != 0) {
-        fprintf(stderr, "cpulse: unknown --tok-backend '%s' "
-                "(want json or spiece)\n", cli->tok_backend);
-        return -1;
-    }
-    return 0;
 }
 
 static int is_t5_model_dir(const char *model_dir) {
@@ -267,16 +249,12 @@ static int is_t5_model_dir(const char *model_dir) {
 }
 
 static int cmd_token_t5(const cp_cli_t *cli) {
-    cp_t5_tok_backend_t backend;
-    if (resolve_t5_tok_backend(cli, &backend) != 0) return 1;
-
     cp_t5_tok_t *tok = NULL;
-    if (cp_t5_tok_load(&tok, cli->model_dir, backend) != 0) {
+    if (cp_t5_tok_load(&tok, cli->model_dir) != 0) {
         printf("Result: FAIL - T5 tokenizer loading failed (see stderr).\n");
         return 6;
     }
-    printf("t5_tok: backend=%s vocab=%zu pad=%u eos=%u unk=%u\n",
-           cp_t5_tok_backend_name(cp_t5_tok_backend(tok)),
+    printf("t5_tok: vocab=%zu pad=%u eos=%u unk=%u\n",
            cp_t5_tok_vocab_size(tok), cp_t5_tok_pad_id(tok),
            cp_t5_tok_eos_id(tok), cp_t5_tok_unk_id(tok));
 
