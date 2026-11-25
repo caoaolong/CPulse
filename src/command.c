@@ -9,6 +9,7 @@
 #include "arch.h"
 #include "generate.h"
 #include "model.h"
+#include "view.h"
 #include "safetensors.h"
 #include "t5_config.h"
 #include "t5_tokenizer.h"
@@ -228,15 +229,96 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
 
 void cp_cmd_help(const char *prog) {
     printf("Usage: %s [--model <model_dir>] [--arch-config <path>] "
-           "[--input <text>] [--token <token>] [--max-new <n>] [--gpu]\n", prog);
+           "[--input <text>] [--token <token>] [--view [out.svg]] "
+           "[--max-new <n>] [--gpu]\n", prog);
     printf("  --model <model_dir>       path to the model directory\n");
     printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
     printf("  --arch-config <path>      model_type -> strategy routes JSON\n");
     printf("                            (default: %s)\n", CP_DEFAULT_ARCH_CONFIG);
     printf("  --input <text>            greedy-generate a continuation of <text>\n");
     printf("  --token <token>           print the vocab id of one surface-form token\n");
+    printf("  --view [out.svg]          write model-structure SVG "
+           "(default: <model_name>.svg)\n");
     printf("  --max-new <n>             tokens to generate (default %d)\n", CP_DEFAULT_MAX_NEW);
     printf("  --gpu                     run the forward pass on CUDA (falls back to cpu)\n");
+}
+
+/* Basename of model_dir -> "<name>.svg" into out (cap bytes). */
+static void view_default_svg_path(const char *model_dir, char *out, size_t cap) {
+    const char *base = model_dir ? model_dir : "model";
+    /* skip trailing / and \\ */
+    size_t n = strlen(base);
+    while (n > 0 && (base[n - 1] == '/' || base[n - 1] == '\\')) n--;
+    size_t start = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (base[i] == '/' || base[i] == '\\') start = i + 1;
+    }
+    if (start >= n) {
+        snprintf(out, cap, "model.svg");
+        return;
+    }
+    size_t len = n - start;
+    if (len + 5 > cap) len = cap > 5 ? cap - 5 : 0; /* room for ".svg\0" */
+    memcpy(out, base + start, len);
+    out[len] = '\0';
+    snprintf(out + len, cap - len, ".svg");
+}
+
+/*
+ * --view only needs config.json (no weight bind). Writes one rect per
+ * block with shape annotations.
+ */
+static int cmd_view(const cp_cli_t *cli) {
+    char default_path[256];
+    view_default_svg_path(cli->model_dir, default_path, sizeof default_path);
+    const char *out_path =
+        (cli->view_path && cli->view_path[0]) ? cli->view_path : default_path;
+
+    char config_path[512];
+    snprintf(config_path, sizeof config_path, "%s/config.json", cli->model_dir);
+
+    char model_type[32];
+    if (cp_config_peek_model_type(config_path, model_type, sizeof model_type) != 0) {
+        printf("Result: FAIL - config loading failed (see stderr).\n");
+        return 3;
+    }
+    const cp_arch_t *arch = cp_arch_resolve(model_type);
+    if (!arch) {
+        fprintf(stderr, "cp_config: unknown model_type '%s'\n", model_type);
+        cp_arch_print_registry(stderr);
+        printf("Result: FAIL - config loading failed (see stderr).\n");
+        return 3;
+    }
+
+    int rc = -1;
+    if (arch->id == CP_ARCH_ENCODER_DECODER) {
+        cp_t5_config_t t5;
+        if (cp_t5_config_load(config_path, &t5) != 0) {
+            printf("Result: FAIL - T5 config loading failed (see stderr).\n");
+            return 3;
+        }
+        rc = cp_model_view_t5(&t5, out_path);
+    } else if (arch->id == CP_ARCH_DECODER_ONLY) {
+        cp_config_t cfg;
+        if (cp_config_load(config_path, &cfg) != 0) {
+            printf("Result: FAIL - config loading failed (see stderr).\n");
+            return 3;
+        }
+        rc = cp_model_view_qwen(&cfg, out_path);
+    } else {
+        fprintf(stderr, "view: strategy '%s' has no diagram yet\n",
+                arch->name);
+        printf("Result: FAIL - model view not supported for this strategy.\n");
+        return 3;
+    }
+
+    if (rc != 0) {
+        printf("Result: FAIL - could not write SVG (see stderr).\n");
+        return 8;
+    }
+    printf("view: wrote %s\n", out_path);
+    printf("OK\n");
+    return 0;
 }
 
 static int is_t5_model_dir(const char *model_dir) {
@@ -446,6 +528,7 @@ int cp_command_run(const cp_cli_t *cli) {
         }
     }
 
+    if (cli->view_path) return cmd_view(cli);
     if (cli->token_text) return cmd_token(cli);
     if (cli->input_text) return cmd_generate(cli);
     return cmd_summary(cli);

@@ -8,6 +8,7 @@
  *   ./build/cpulse.exe
  *   ./build/cpulse.exe --input <text>
  *   ./build/cpulse.exe --model <dir> --token <tok>
+ *   ./build/cpulse.exe --model <dir> --view [out.svg]
  */
 
 #include <stdio.h>
@@ -33,6 +34,7 @@ int main(int argc, char **argv) {
         .arch_config = NULL,
         .input_text  = NULL,
         .token_text  = NULL,
+        .view_path   = NULL,
         .max_new     = CP_DEFAULT_MAX_NEW,
         .use_gpu     = 0,
     };
@@ -73,6 +75,15 @@ int main(int argc, char **argv) {
             if (cli.max_new <= 0) cli.max_new = CP_DEFAULT_MAX_NEW;
         } else if (strcmp(argv[i], "--gpu") == 0) {
             cli.use_gpu = 1;
+        } else if (strcmp(argv[i], "--view") == 0) {
+            /* optional path: --view out.svg  or bare --view.
+             * Do NOT treat cppdbg's injected "2>CON" / "1>CON" as a path. */
+            if (i + 1 < argc && argv[i + 1][0] != '-' &&
+                !is_console_redir_token(argv[i + 1])) {
+                cli.view_path = argv[++i];
+            } else {
+                cli.view_path = ""; /* default: <model_name>.svg */
+            }
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             cp_cmd_help(argv[0]);
             return 0;

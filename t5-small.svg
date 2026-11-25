@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="2718" viewBox="0 0 640 2718">
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  <text x="36" y="40" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#0f172a">t5 — encoder-decoder</text>
+  <g transform="translate(0,60)">
+  <rect x="36" y="0" width="568" height="48" rx="5" ry="5" fill="#dbeafe" stroke="#334155" stroke-width="1.2"/>
+  <text x="44" y="18" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">Shared Embedding</text>
+  <text x="44" y="34" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">shared.weight  [32128, 512]  pad=0 eos=1 start=0</text>
+  <rect x="36" y="60" width="568" height="446" rx="6" ry="6" fill="#f8fafc" stroke="#334155" stroke-width="1.4"/>
+  <text x="46" y="76" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Encoder Block 0</text>
+  <rect x="48" y="96" width="544" height="172" rx="6" ry="6" fill="#e0f2fe" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="112" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Self-Attention</text>
+  <text x="58" y="128" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">heads=8  Q/K/V/O [512,512]  + rel_bias[32]</text>
+  <rect x="60" y="146" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="164" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 0</text>
+  <text x="68" y="184" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="146" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="164" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 1</text>
+  <text x="200" y="184" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="146" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="164" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 2</text>
+  <text x="332" y="184" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="146" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="164" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 3</text>
+  <text x="464" y="184" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="60" y="206" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="224" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 4</text>
+  <text x="68" y="244" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="206" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="224" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 5</text>
+  <text x="200" y="244" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="206" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="224" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 6</text>
+  <text x="332" y="244" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="206" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="224" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 7</text>
+  <text x="464" y="244" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="48" y="276" width="544" height="220" rx="6" ry="6" fill="#f0f9ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="292" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">FFN</text>
+  <text x="58" y="308" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">DenseReluDense (relu)</text>
+  <rect x="60" y="326" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="344" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wi</text>
+  <text x="68" y="360" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[2048, 512]</text>
+  <rect x="60" y="382" width="520" height="48" rx="5" ry="5" fill="#fef9c3" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="400" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">Act</text>
+  <text x="68" y="416" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">relu</text>
+  <rect x="60" y="438" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="456" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wo</text>
+  <text x="68" y="472" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[512, 2048]</text>
+  <rect x="46" y="528" width="568" height="56" rx="6" ry="6" fill="#e0f2fe" stroke="#94a3b8" stroke-width="1" opacity="0.85"/>
+  <rect x="41" y="523" width="568" height="56" rx="6" ry="6" fill="#e0f2fe" stroke="#94a3b8" stroke-width="1" opacity="0.85"/>
+  <rect x="36" y="518" width="568" height="56" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="44" y="536" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#0f172a">Encoder Blocks 1 .. 4</text>
+  <text x="44" y="560" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">x4 identical  (same structure as block 0)</text>
+  <rect x="36" y="596" width="568" height="446" rx="6" ry="6" fill="#f8fafc" stroke="#334155" stroke-width="1.4"/>
+  <text x="46" y="612" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Encoder Block 5</text>
+  <rect x="48" y="632" width="544" height="172" rx="6" ry="6" fill="#e0f2fe" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="648" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Self-Attention</text>
+  <text x="58" y="664" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">heads=8  Q/K/V/O [512,512]  (rel_bias shared)</text>
+  <rect x="60" y="682" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="700" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 0</text>
+  <text x="68" y="720" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="682" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="700" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 1</text>
+  <text x="200" y="720" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="682" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="700" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 2</text>
+  <text x="332" y="720" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="682" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="700" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 3</text>
+  <text x="464" y="720" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="60" y="742" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="760" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 4</text>
+  <text x="68" y="780" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="742" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="760" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 5</text>
+  <text x="200" y="780" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="742" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="760" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 6</text>
+  <text x="332" y="780" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="742" width="124" height="52" rx="5" ry="5" fill="#bae6fd" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="760" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 7</text>
+  <text x="464" y="780" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="48" y="812" width="544" height="220" rx="6" ry="6" fill="#f0f9ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="828" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">FFN</text>
+  <text x="58" y="844" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">DenseReluDense (relu)</text>
+  <rect x="60" y="862" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="880" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wi</text>
+  <text x="68" y="896" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[2048, 512]</text>
+  <rect x="60" y="918" width="520" height="48" rx="5" ry="5" fill="#fef9c3" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="936" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">Act</text>
+  <text x="68" y="952" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">relu</text>
+  <rect x="60" y="974" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="992" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wo</text>
+  <text x="68" y="1008" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[512, 2048]</text>
+  <rect x="36" y="1054" width="568" height="626" rx="6" ry="6" fill="#faf5ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="46" y="1070" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Decoder Block 0</text>
+  <rect x="48" y="1090" width="544" height="172" rx="6" ry="6" fill="#f3e8ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="1106" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Self-Attention</text>
+  <text x="58" y="1122" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">causal  heads=8  + rel_bias[32]</text>
+  <rect x="60" y="1140" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1158" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 0</text>
+  <text x="68" y="1178" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="1140" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="1158" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 1</text>
+  <text x="200" y="1178" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="1140" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="1158" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 2</text>
+  <text x="332" y="1178" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="1140" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="1158" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 3</text>
+  <text x="464" y="1178" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="60" y="1200" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1218" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 4</text>
+  <text x="68" y="1238" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="1200" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="1218" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 5</text>
+  <text x="200" y="1238" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="1200" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="1218" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 6</text>
+  <text x="332" y="1238" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="1200" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="1218" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 7</text>
+  <text x="464" y="1238" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="48" y="1270" width="544" height="172" rx="6" ry="6" fill="#fae8ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="1286" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Cross-Attention</text>
+  <text x="58" y="1302" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">EncDec  heads=8  Q&lt;-dec  K/V&lt;-enc  [512]</text>
+  <rect x="60" y="1320" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1338" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 0</text>
+  <text x="68" y="1358" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="1320" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="1338" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 1</text>
+  <text x="200" y="1358" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="1320" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="1338" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 2</text>
+  <text x="332" y="1358" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="1320" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="1338" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 3</text>
+  <text x="464" y="1358" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="60" y="1380" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1398" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 4</text>
+  <text x="68" y="1418" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="1380" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="1398" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 5</text>
+  <text x="200" y="1418" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="1380" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="1398" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 6</text>
+  <text x="332" y="1418" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="1380" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="1398" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 7</text>
+  <text x="464" y="1418" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="48" y="1450" width="544" height="220" rx="6" ry="6" fill="#fdf4ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="1466" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">FFN</text>
+  <text x="58" y="1482" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">DenseReluDense (relu)</text>
+  <rect x="60" y="1500" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1518" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wi</text>
+  <text x="68" y="1534" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[2048, 512]</text>
+  <rect x="60" y="1556" width="520" height="48" rx="5" ry="5" fill="#fef9c3" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1574" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">Act</text>
+  <text x="68" y="1590" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">relu</text>
+  <rect x="60" y="1612" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1630" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wo</text>
+  <text x="68" y="1646" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[512, 2048]</text>
+  <rect x="46" y="1702" width="568" height="56" rx="6" ry="6" fill="#fae8ff" stroke="#94a3b8" stroke-width="1" opacity="0.85"/>
+  <rect x="41" y="1697" width="568" height="56" rx="6" ry="6" fill="#fae8ff" stroke="#94a3b8" stroke-width="1" opacity="0.85"/>
+  <rect x="36" y="1692" width="568" height="56" rx="5" ry="5" fill="#fae8ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="44" y="1710" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#0f172a">Decoder Blocks 1 .. 4</text>
+  <text x="44" y="1734" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">x4 identical  (same structure as block 0)</text>
+  <rect x="36" y="1770" width="568" height="626" rx="6" ry="6" fill="#faf5ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="46" y="1786" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Decoder Block 5</text>
+  <rect x="48" y="1806" width="544" height="172" rx="6" ry="6" fill="#f3e8ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="1822" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Self-Attention</text>
+  <text x="58" y="1838" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">causal  heads=8  (rel_bias shared)</text>
+  <rect x="60" y="1856" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1874" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 0</text>
+  <text x="68" y="1894" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="1856" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="1874" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 1</text>
+  <text x="200" y="1894" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="1856" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="1874" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 2</text>
+  <text x="332" y="1894" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="1856" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="1874" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 3</text>
+  <text x="464" y="1894" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="60" y="1916" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="1934" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 4</text>
+  <text x="68" y="1954" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="1916" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="1934" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 5</text>
+  <text x="200" y="1954" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="1916" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="1934" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 6</text>
+  <text x="332" y="1954" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="1916" width="124" height="52" rx="5" ry="5" fill="#e9d5ff" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="1934" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 7</text>
+  <text x="464" y="1954" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="48" y="1986" width="544" height="172" rx="6" ry="6" fill="#fae8ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="2002" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Cross-Attention</text>
+  <text x="58" y="2018" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">EncDec  heads=8  Q&lt;-dec  K/V&lt;-enc  [512]</text>
+  <rect x="60" y="2036" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="2054" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 0</text>
+  <text x="68" y="2074" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="2036" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="2054" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 1</text>
+  <text x="200" y="2074" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="2036" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="2054" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 2</text>
+  <text x="332" y="2074" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="2036" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="2054" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 3</text>
+  <text x="464" y="2074" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="60" y="2096" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="2114" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 4</text>
+  <text x="68" y="2134" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="192" y="2096" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="200" y="2114" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 5</text>
+  <text x="200" y="2134" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="324" y="2096" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="332" y="2114" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 6</text>
+  <text x="332" y="2134" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="456" y="2096" width="124" height="52" rx="5" ry="5" fill="#f5d0fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="464" y="2114" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f172a">Head 7</text>
+  <text x="464" y="2134" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">d<tspan baseline-shift="sub" font-size="8">kv</tspan>=64</text>
+  <rect x="48" y="2166" width="544" height="220" rx="6" ry="6" fill="#fdf4ff" stroke="#334155" stroke-width="1.4"/>
+  <text x="58" y="2182" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">FFN</text>
+  <text x="58" y="2198" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">DenseReluDense (relu)</text>
+  <rect x="60" y="2216" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="2234" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wi</text>
+  <text x="68" y="2250" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[2048, 512]</text>
+  <rect x="60" y="2272" width="520" height="48" rx="5" ry="5" fill="#fef9c3" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="2290" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">Act</text>
+  <text x="68" y="2306" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">relu</text>
+  <rect x="60" y="2328" width="520" height="48" rx="5" ry="5" fill="#e0f2fe" stroke="#334155" stroke-width="1.2"/>
+  <text x="68" y="2346" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">wo</text>
+  <text x="68" y="2362" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">[512, 2048]</text>
+  <rect x="36" y="2408" width="568" height="206" rx="6" ry="6" fill="#ffffff" stroke="#334155" stroke-width="1.4"/>
+  <text x="46" y="2424" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Output Head</text>
+  <rect x="48" y="2444" width="544" height="48" rx="5" ry="5" fill="#fef9c3" stroke="#334155" stroke-width="1.2"/>
+  <text x="56" y="2462" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">Encoder Final LN</text>
+  <text x="56" y="2478" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">weight  [512]  eps=1e-06</text>
+  <rect x="48" y="2500" width="544" height="48" rx="5" ry="5" fill="#fef9c3" stroke="#334155" stroke-width="1.2"/>
+  <text x="56" y="2518" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">Decoder Final LN</text>
+  <text x="56" y="2534" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">weight  [512]  eps=1e-06</text>
+  <rect x="48" y="2556" width="544" height="48" rx="5" ry="5" fill="#dcfce7" stroke="#334155" stroke-width="1.2"/>
+  <text x="56" y="2574" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0f172a">LM Head (tied)</text>
+  <text x="56" y="2590" font-family="Consolas,Menlo,monospace" font-size="10" fill="#475569">tied to shared  [32128, 512]</text>
+  </g>
+</svg>

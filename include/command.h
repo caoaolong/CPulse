@@ -22,6 +22,7 @@ typedef struct {
     const char *arch_config; /* NULL => CP_DEFAULT_ARCH_CONFIG */
     const char *input_text;  /* NULL unless --input */
     const char *token_text;  /* NULL unless --token (takes priority) */
+    const char *view_path;   /* non-NULL => --view ("" = default path) */
     int         max_new;
     int         use_gpu;
 } cp_cli_t;
