@@ -8,7 +8,7 @@
  */
 
 #include "tokenizer.h"
-#include "json.h"
+#include "cJSON.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -184,40 +184,36 @@ static int load_vocab(cp_tok_t *t, const char *path) {
     if (read_file(path, &buf, &n) != 0) return -1;
     if (t_map_init(&t->vocab, 262144) != 0) { free(buf); return -1; }
 
-    json_parser_t j = { buf, buf + n, 0 };
-    json_expect(&j, '{');
-    while (!j.err) {
-        int c = json_peek(&j);
-        if (c == '}') { json_next(&j); break; }
-        size_t klen = 0;
-        char *key = json_parse_string(&j, &klen);
-        if (j.err) { free(key); break; }
-        json_expect(&j, ':');
-        uint64_t id = 0;
-        if (!j.err) id = json_parse_uint(&j);
-        if (j.err || klen == 0 || klen > 0xFFFFFFFFu || id > 0xFFFFFFFFu) {
-            j.err = 1;
-            free(key);
-            break;
-        }
-        if (t_map_put(&t->vocab, key, klen, (uint32_t)id) != 0) {
-            fprintf(stderr, "tok: out of memory loading vocab\n");
-            free(key);
-            j.err = 1;
-            break;
-        }
-        if (id > t->max_id) t->max_id = (uint32_t)id;
-        free(key);
-        c = json_peek(&j);
-        if (c == ',') { json_next(&j); continue; }
-        if (c == '}') { json_next(&j); break; }
-        j.err = 1;
-    }
+    cJSON *root = cJSON_ParseWithLength(buf, n);
     free(buf);
-    if (j.err) {
+    if (!root || !cJSON_IsObject(root)) {
         fprintf(stderr, "tok: parse error in '%s'\n", path);
+        cJSON_Delete(root);
         return -1;
     }
+
+    const cJSON *it = NULL;
+    cJSON_ArrayForEach(it, root) {
+        if (!it->string || !cJSON_IsNumber(it)) {
+            cJSON_Delete(root);
+            fprintf(stderr, "tok: parse error in '%s'\n", path);
+            return -1;
+        }
+        size_t klen = strlen(it->string);
+        uint32_t id = (uint32_t)it->valuedouble;
+        if (klen == 0 || klen > 0xFFFFFFFFu) {
+            cJSON_Delete(root);
+            fprintf(stderr, "tok: parse error in '%s'\n", path);
+            return -1;
+        }
+        if (t_map_put(&t->vocab, it->string, klen, id) != 0) {
+            fprintf(stderr, "tok: out of memory loading vocab\n");
+            cJSON_Delete(root);
+            return -1;
+        }
+        if (id > t->max_id) t->max_id = id;
+    }
+    cJSON_Delete(root);
     return 0;
 }
 
@@ -304,76 +300,35 @@ static int load_specials(cp_tok_t *t, const char *path) {
     size_t n = 0;
     if (read_file(path, &buf, &n) != 0) return -1;
 
-    json_parser_t j = { buf, buf + n, 0 };
-    json_expect(&j, '{');
-    while (!j.err) {
-        int c = json_peek(&j);
-        if (c == '}') { json_next(&j); break; }
-        size_t klen = 0;
-        char *key = json_parse_string(&j, &klen);
-        if (j.err) { free(key); break; }
-        json_expect(&j, ':');
-        if (j.err) { free(key); break; }
-        if (strcmp(key, "added_tokens_decoder") == 0) {
-            json_expect(&j, '{');
-            while (!j.err) {
-                c = json_peek(&j);
-                if (c == '}') { json_next(&j); break; }
-                size_t ilen = 0;
-                char *ids = json_parse_string(&j, &ilen);
-                if (j.err) { free(ids); break; }
-                json_expect(&j, ':');
-                uint32_t id = (uint32_t)strtoul(ids, NULL, 10);
-                free(ids);
-                if (j.err) break;
-                json_expect(&j, '{');
-                while (!j.err) {
-                    c = json_peek(&j);
-                    if (c == '}') { json_next(&j); break; }
-                    size_t flen = 0;
-                    char *fk = json_parse_string(&j, &flen);
-                    if (j.err) { free(fk); break; }
-                    json_expect(&j, ':');
-                    if (j.err) { free(fk); break; }
-                    if (strcmp(fk, "content") == 0) {
-                        size_t clen = 0;
-                        char *cv = json_parse_string(&j, &clen);
-                        if (j.err) { free(cv); free(fk); break; }
-                        if (add_spec(t, cv, clen, id) != 0) {
-                            free(cv);
-                            free(fk);
-                            j.err = 1;
-                            break;
-                        }
-                        free(cv);
-                    } else {
-                        json_skip_value(&j);
-                    }
-                    free(fk);
-                    if (j.err) break;
-                    c = json_peek(&j);
-                    if (c == ',') { json_next(&j); continue; }
-                    if (c == '}') { json_next(&j); break; }
-                    j.err = 1;
-                }
-                if (j.err) break;
-                c = json_peek(&j);
-                if (c == ',') { json_next(&j); continue; }
-                if (c == '}') { json_next(&j); break; }
-                j.err = 1;
-            }
-        } else {
-            json_skip_value(&j);
-        }
-        free(key);
-        if (j.err) break;
-        c = json_peek(&j);
-        if (c == ',') { json_next(&j); continue; }
-        if (c == '}') { json_next(&j); break; }
-        j.err = 1;
-    }
+    cJSON *root = cJSON_ParseWithLength(buf, n);
     free(buf);
-    if (j.err || t->n_spec == 0) {
+    if (!root || !cJSON_IsObject(root)) {
+        fprintf(stderr, "tok: parse error in '%s'\n", path);
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    const cJSON *dec = cJSON_GetObjectItemCaseSensitive(root, "added_tokens_decoder");
+    if (!cJSON_IsObject(dec)) {
+        fprintf(stderr, "tok: parse error in '%s'\n", path);
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    const cJSON *entry = NULL;
+    cJSON_ArrayForEach(entry, dec) {
+        if (!entry->string || !cJSON_IsObject(entry)) continue;
+        uint32_t id = (uint32_t)strtoul(entry->string, NULL, 10);
+        const cJSON *content = cJSON_GetObjectItemCaseSensitive(entry, "content");
+        if (!cJSON_IsString(content) || !content->valuestring) continue;
+        size_t clen = strlen(content->valuestring);
+        if (add_spec(t, content->valuestring, clen, id) != 0) {
+            cJSON_Delete(root);
+            return -1;
+        }
+    }
+    cJSON_Delete(root);
+    if (t->n_spec == 0) {
         fprintf(stderr, "tok: parse error in '%s'\n", path);
         return -1;
     }

@@ -6,9 +6,9 @@
  *
  * Holds the architecture hyperparameters parsed from the model's
  * config.json, plus the derived values the forward pass needs
- * (arch id, head_dim, kv repeat factor). Validation routes model_type
- * through cp_arch_resolve; stub arches fail early, implemented ones
- * get full shape / activation checks.
+ * (strategy id, head_dim, kv repeat factor). Validation maps model_type
+ * through arch_routes.json; stub strategies fail early, implemented
+ * ones get full shape / activation checks.
  */
 
 #ifndef MODEL_H

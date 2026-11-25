@@ -1,9 +1,9 @@
 /*
- * arch.h - architecture routing for CPulse
+ * arch.h - architecture strategy routing for CPulse
  *
- * Maps config.json "model_type" to a known architecture entry.
- * Only implemented arches may proceed to weight bind / forward;
- * recognized-but-stub arches fail early with a clear message.
+ * model_type is mapped to one of three strategies via a JSON route file
+ * (default: arch_routes.json). Implementation availability is decided
+ * in code (currently only decoder-only can run).
  */
 
 #ifndef ARCH_H
@@ -15,31 +15,39 @@
 extern "C" {
 #endif
 
+#define CP_DEFAULT_ARCH_CONFIG "arch_routes.json"
+
 typedef enum {
     CP_ARCH_UNKNOWN = 0,
-    CP_ARCH_QWEN2,
-    CP_ARCH_LLAMA,
-    CP_ARCH_MISTRAL,
-    CP_ARCH_T5
+    CP_ARCH_ENCODER_ONLY,
+    CP_ARCH_DECODER_ONLY,
+    CP_ARCH_ENCODER_DECODER
 } cp_arch_id_t;
 
 typedef struct cp_arch {
-    cp_arch_id_t id;
-    const char  *name;         /* canonical id string, e.g. "qwen2" */
-    const char  *family;       /* "decoder-only" / "encoder-decoder" */
-    int          implemented;  /* 1 = bind+forward available */
+    cp_arch_id_t id;           /* strategy */
+    const char  *name;         /* "decoder-only" / ... */
+    const char  *family;       /* same as name (kept for call sites) */
+    int          implemented;  /* 1 = bind+forward path exists */
 } cp_arch_t;
 
 /*
- * Resolve model_type (from config.json) to an architecture entry.
- * Returns NULL when the string is unknown.
+ * Load / reload the route table from path.
+ * Expected shape:
+ *   { "decoder-only": ["qwen2", ...],
+ *     "encoder-only": [...],
+ *     "encoder-decoder": [...] }
+ * Returns 0 on success; on failure prints to stderr and returns -1.
  */
+int cp_arch_routes_load(const char *path);
+
+/* Resolve model_type using the loaded route table. NULL if unknown. */
 const cp_arch_t *cp_arch_resolve(const char *model_type);
 
-/* Canonical name for an id; "unknown" if not recognized. */
+/* Strategy name for an id; "unknown" if not recognized. */
 const char *cp_arch_name(cp_arch_id_t id);
 
-/* Print recognized model_type values and implementation status. */
+/* Print the loaded route table (or a hint if not loaded). */
 void cp_arch_print_registry(FILE *fp);
 
 #ifdef __cplusplus

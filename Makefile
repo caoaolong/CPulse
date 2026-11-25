@@ -25,6 +25,7 @@ CC      := gcc
 BUILD   := build
 INC     := include
 SRC     := src
+CJSON   := third_party/cJSON
 TARGET_NAME := cpulse.exe
 
 # ---------------------------------------------------------------- platform
@@ -47,11 +48,12 @@ endif
 # ---------------------------------------------------------------- sources
 SRCS := $(wildcard $(SRC)/*.c)
 OBJS := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
+OBJS += $(BUILD)/cJSON.o
 DEPS := $(OBJS:.o=.d)
 
 # ---------------------------------------------------------------- flags
-CFLAGS_RELEASE := -O2 -std=c11 -Wall -Wextra -I$(INC)
-CFLAGS_DEBUG   := -O0 -g3 -std=c11 -Wall -Wextra -I$(INC)
+CFLAGS_RELEASE := -O2 -std=c11 -Wall -Wextra -I$(INC) -I$(CJSON)
+CFLAGS_DEBUG   := -O0 -g3 -std=c11 -Wall -Wextra -I$(INC) -I$(CJSON)
 LDLIBS         := -lm
 
 # default (no target given): release
@@ -93,6 +95,9 @@ $(BUILD):
 
 # compile: .c -> .o (also emit dependency files for incremental builds)
 $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/cJSON.o: $(CJSON)/cJSON.c | $(BUILD)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 # link

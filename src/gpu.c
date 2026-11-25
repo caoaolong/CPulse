@@ -636,9 +636,10 @@ int gpu_forward_init(const cp_config_t *cfg, const cp_weights_t *w) {
     if (!s_ready && gpu_init() != 0) return -1;
     if (g_fwd) return 0;
     if (!cfg || !w || !w->layers || cfg->num_hidden_layers == 0) return -1;
-    if (cfg->arch != CP_ARCH_QWEN2) {
+    if (cfg->arch != CP_ARCH_DECODER_ONLY) {
         fprintf(stderr,
-                "gpu: forward not implemented for arch '%s' (model_type='%s')\n",
+                "gpu: forward not implemented for strategy '%s' "
+                "(model_type='%s')\n",
                 cp_arch_name(cfg->arch), cfg->model_type);
         return -1;
     }

@@ -53,9 +53,10 @@ static const st_tensor_t *expect(
 int cp_weights_bind(const cp_config_t *cfg, const st_file_t *f, cp_weights_t *out) {
     memset(out, 0, sizeof(*out));
     if (!cfg || !f) return -1;
-    if (cfg->arch != CP_ARCH_QWEN2) {
+    if (cfg->arch != CP_ARCH_DECODER_ONLY) {
         fprintf(stderr,
-                "cp_weights: bind not implemented for arch '%s' (model_type='%s')\n",
+                "cp_weights: bind not implemented for strategy '%s' "
+                "(model_type='%s')\n",
                 cp_arch_name(cfg->arch), cfg->model_type);
         return -1;
     }

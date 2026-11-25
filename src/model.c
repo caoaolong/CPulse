@@ -1,23 +1,19 @@
 /*
  * model.c - config.json loader (see model.h)
  *
- * Parses the flat config object with the standalone parser in
- * json.h/json.c. Unknown keys are skipped so extra vendor fields
- * never break loading; every required key is tracked and missing
- * keys fail the load. One exception: rope_scaling must be absent or
- * null (standard RoPE); anything else fails loudly, since it would
- * silently change position handling.
+ * Parses the flat config object with cJSON. Unknown keys are ignored so
+ * extra vendor fields never break loading. rope_scaling must be absent
+ * or null (standard RoPE); anything else fails loudly.
  */
 
 #include "model.h"
 #include "arch.h"
-#include "json.h"
+#include "cJSON.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* required-key bookkeeping */
 #define REQ_VOCAB      (1u << 0)
 #define REQ_HIDDEN     (1u << 1)
 #define REQ_INTER      (1u << 2)
@@ -33,12 +29,38 @@
                         REQ_HEADS | REQ_KV_HEADS | REQ_MAX_POS | REQ_NORM_EPS | \
                         REQ_ROPE_THETA | REQ_ACT | REQ_MODEL_TYPE)
 
-/* copy a parsed string into a fixed buffer; truncates, never overflows */
-static void copy_str(char *dst, size_t cap, char *src) {
+static void copy_cstr(char *dst, size_t cap, const char *src) {
     if (!src) return;
     strncpy(dst, src, cap - 1);
     dst[cap - 1] = '\0';
-    free(src);
+}
+
+static int get_u32(const cJSON *obj, const char *key, uint32_t *out) {
+    const cJSON *it = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (!cJSON_IsNumber(it)) return 0;
+    *out = (uint32_t)it->valuedouble;
+    return 1;
+}
+
+static int get_f64(const cJSON *obj, const char *key, double *out) {
+    const cJSON *it = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (!cJSON_IsNumber(it)) return 0;
+    *out = it->valuedouble;
+    return 1;
+}
+
+static int get_bool(const cJSON *obj, const char *key, int *out) {
+    const cJSON *it = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (!cJSON_IsBool(it)) return 0;
+    *out = cJSON_IsTrue(it) ? 1 : 0;
+    return 1;
+}
+
+static int get_str(const cJSON *obj, const char *key, char *dst, size_t cap) {
+    const cJSON *it = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (!cJSON_IsString(it) || !it->valuestring) return 0;
+    copy_cstr(dst, cap, it->valuestring);
+    return 1;
 }
 
 static int cp_config_validate(cp_config_t *c, unsigned seen) {
@@ -47,8 +69,6 @@ static int cp_config_validate(cp_config_t *c, unsigned seen) {
         return -1;
     }
 
-    /* Architecture routing: resolve first so stub arches fail clearly
-     * without demanding Qwen2-only hyperparameters. */
     const cp_arch_t *arch = cp_arch_resolve(c->model_type);
     if (!arch) {
         fprintf(stderr, "cp_config: unknown model_type '%s'\n", c->model_type);
@@ -59,13 +79,12 @@ static int cp_config_validate(cp_config_t *c, unsigned seen) {
 
     if (!arch->implemented) {
         fprintf(stderr,
-                "cp_config: architecture '%s' (%s) recognized from "
-                "model_type='%s', but not implemented yet\n",
-                arch->name, arch->family, c->model_type);
+                "cp_config: strategy '%s' recognized from model_type='%s', "
+                "but not implemented yet\n",
+                arch->name, c->model_type);
         return -1;
     }
 
-    /* Implemented path (currently Qwen2 only): full shape checks. */
     if (seen != REQ_ALL) {
         fprintf(stderr, "cp_config: missing required keys (seen=0x%x, want=0x%x)\n",
                 seen, REQ_ALL);
@@ -120,90 +139,49 @@ int cp_config_load(const char *path, cp_config_t *out) {
     fclose(fp);
     buf[size] = '\0';
 
-    memset(out, 0, sizeof(*out));
-    /* non-zero defaults for optional keys */
-    out->bos_token_id = 0;
-    out->eos_token_id = 0;
-
-    json_parser_t j = { buf, buf + size, 0 };
-    json_expect(&j, '{');
-    unsigned seen = 0;
-
-    while (!j.err) {
-        int c = json_peek(&j);
-        if (c == '}') { json_next(&j); break; }
-
-        size_t klen = 0;
-        char *key = json_parse_string(&j, &klen);
-        if (j.err) { free(key); break; }
-        json_expect(&j, ':');
-        if (j.err) { free(key); break; }
-
-        if (strcmp(key, "vocab_size") == 0) {
-            out->vocab_size = (uint32_t)json_parse_uint(&j); seen |= REQ_VOCAB;
-        } else if (strcmp(key, "hidden_size") == 0) {
-            out->hidden_size = (uint32_t)json_parse_uint(&j); seen |= REQ_HIDDEN;
-        } else if (strcmp(key, "intermediate_size") == 0) {
-            out->intermediate_size = (uint32_t)json_parse_uint(&j); seen |= REQ_INTER;
-        } else if (strcmp(key, "num_hidden_layers") == 0) {
-            out->num_hidden_layers = (uint32_t)json_parse_uint(&j); seen |= REQ_LAYERS;
-        } else if (strcmp(key, "num_attention_heads") == 0) {
-            out->num_attention_heads = (uint32_t)json_parse_uint(&j); seen |= REQ_HEADS;
-        } else if (strcmp(key, "num_key_value_heads") == 0) {
-            out->num_key_value_heads = (uint32_t)json_parse_uint(&j); seen |= REQ_KV_HEADS;
-        } else if (strcmp(key, "max_position_embeddings") == 0) {
-            out->max_position_embeddings = (uint32_t)json_parse_uint(&j); seen |= REQ_MAX_POS;
-        } else if (strcmp(key, "bos_token_id") == 0) {
-            out->bos_token_id = (uint32_t)json_parse_uint(&j);
-        } else if (strcmp(key, "eos_token_id") == 0) {
-            out->eos_token_id = (uint32_t)json_parse_uint(&j);
-        } else if (strcmp(key, "rms_norm_eps") == 0) {
-            out->rms_norm_eps = json_parse_number(&j); seen |= REQ_NORM_EPS;
-        } else if (strcmp(key, "rope_theta") == 0) {
-            out->rope_theta = json_parse_number(&j); seen |= REQ_ROPE_THETA;
-        } else if (strcmp(key, "tie_word_embeddings") == 0) {
-            out->tie_word_embeddings = json_parse_bool(&j);
-        } else if (strcmp(key, "hidden_act") == 0) {
-            copy_str(out->hidden_act, sizeof(out->hidden_act),
-                     json_parse_string(&j, NULL)); seen |= REQ_ACT;
-        } else if (strcmp(key, "model_type") == 0) {
-            copy_str(out->model_type, sizeof(out->model_type),
-                     json_parse_string(&j, NULL)); seen |= REQ_MODEL_TYPE;
-        } else if (strcmp(key, "rope_scaling") == 0) {
-            /* Explicit contract: only standard RoPE is supported. Absent
-             * or null means standard RoPE. Anything else (e.g.
-             * {"type":"yarn",...}) would silently shift positions, so fail
-             * loudly instead of skipping it like other unknown keys. */
-            static const char null_lit[] = "null";
-            int is_null = 1;
-            for (size_t k = 0; k < sizeof null_lit - 1; k++) {
-                if (json_next(&j) != null_lit[k]) { is_null = 0; break; }
-            }
-            if (!is_null) {
-                fprintf(stderr, "cp_config: unsupported rope_scaling "
-                        "(only standard RoPE, i.e. absent or null, is supported)\n");
-                j.err = 1;
-            }
-        } else if (strcmp(key, "torch_dtype") == 0) {
-            copy_str(out->torch_dtype, sizeof(out->torch_dtype),
-                     json_parse_string(&j, NULL));
-        } else {
-            json_skip_value(&j); /* architectures, sliding_window, ... */
-        }
-        free(key);
-        if (j.err) break;
-
-        c = json_peek(&j);
-        if (c == ',') { json_next(&j); continue; }
-        if (c == '}') { json_next(&j); break; }
-        j.err = 1;
-    }
-
+    cJSON *root = cJSON_Parse(buf);
     free(buf);
-    if (j.err) {
+    if (!root || !cJSON_IsObject(root)) {
         fprintf(stderr, "cp_config: parse error in '%s'\n", path);
+        cJSON_Delete(root);
         return -1;
     }
+
+    memset(out, 0, sizeof(*out));
+    out->bos_token_id = 0;
+    out->eos_token_id = 0;
+    unsigned seen = 0;
+
+    if (get_u32(root, "vocab_size", &out->vocab_size)) seen |= REQ_VOCAB;
+    if (get_u32(root, "hidden_size", &out->hidden_size)) seen |= REQ_HIDDEN;
+    if (get_u32(root, "intermediate_size", &out->intermediate_size)) seen |= REQ_INTER;
+    if (get_u32(root, "num_hidden_layers", &out->num_hidden_layers)) seen |= REQ_LAYERS;
+    if (get_u32(root, "num_attention_heads", &out->num_attention_heads)) seen |= REQ_HEADS;
+    if (get_u32(root, "num_key_value_heads", &out->num_key_value_heads)) seen |= REQ_KV_HEADS;
+    if (get_u32(root, "max_position_embeddings", &out->max_position_embeddings))
+        seen |= REQ_MAX_POS;
+    get_u32(root, "bos_token_id", &out->bos_token_id);
+    get_u32(root, "eos_token_id", &out->eos_token_id);
+    if (get_f64(root, "rms_norm_eps", &out->rms_norm_eps)) seen |= REQ_NORM_EPS;
+    if (get_f64(root, "rope_theta", &out->rope_theta)) seen |= REQ_ROPE_THETA;
+    get_bool(root, "tie_word_embeddings", &out->tie_word_embeddings);
+    if (get_str(root, "hidden_act", out->hidden_act, sizeof out->hidden_act))
+        seen |= REQ_ACT;
+    if (get_str(root, "model_type", out->model_type, sizeof out->model_type))
+        seen |= REQ_MODEL_TYPE;
+    get_str(root, "torch_dtype", out->torch_dtype, sizeof out->torch_dtype);
+
+    {
+        const cJSON *rs = cJSON_GetObjectItemCaseSensitive(root, "rope_scaling");
+        if (rs && !cJSON_IsNull(rs)) {
+            fprintf(stderr, "cp_config: unsupported rope_scaling "
+                    "(only standard RoPE, i.e. absent or null, is supported)\n");
+            cJSON_Delete(root);
+            return -1;
+        }
+    }
+
+    cJSON_Delete(root);
     return cp_config_validate(out, seen);
 }
 

@@ -138,14 +138,16 @@ static int load_model(model_bundle_t *m, const char *model_dir) {
 /* ---- commands ----------------------------------------------------- */
 
 void cp_cmd_help(const char *prog) {
-    printf("Usage: %s [--model <model_dir>] [--input <text>] [--token <token>] "
-           "[--max-new <n>] [--gpu]\n", prog);
-    printf("  --model <model_dir>   path to the model directory\n");
-    printf("                        (default: %s)\n", CP_DEFAULT_MODEL_DIR);
-    printf("  --input <text>        greedy-generate a continuation of <text>\n");
-    printf("  --token <token>       print the vocab id of one surface-form token\n");
-    printf("  --max-new <n>         tokens to generate (default %d)\n", CP_DEFAULT_MAX_NEW);
-    printf("  --gpu                 run the forward pass on CUDA (falls back to cpu)\n");
+    printf("Usage: %s [--model <model_dir>] [--arch-config <path>] "
+           "[--input <text>] [--token <token>] [--max-new <n>] [--gpu]\n", prog);
+    printf("  --model <model_dir>       path to the model directory\n");
+    printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
+    printf("  --arch-config <path>      model_type -> strategy routes JSON\n");
+    printf("                            (default: %s)\n", CP_DEFAULT_ARCH_CONFIG);
+    printf("  --input <text>            greedy-generate a continuation of <text>\n");
+    printf("  --token <token>           print the vocab id of one surface-form token\n");
+    printf("  --max-new <n>             tokens to generate (default %d)\n", CP_DEFAULT_MAX_NEW);
+    printf("  --gpu                     run the forward pass on CUDA (falls back to cpu)\n");
 }
 
 static int cmd_token(const cp_cli_t *cli) {
@@ -293,6 +295,19 @@ static int cmd_generate(const cp_cli_t *cli) {
 
 int cp_command_run(const cp_cli_t *cli) {
     if (!cli || !cli->model_dir) return 1;
+
+    /* Token lookup does not need architecture routes; load them for
+     * summary / generate so model_type can be classified. */
+    if (!cli->token_text) {
+        const char *routes = cli->arch_config ? cli->arch_config
+                                              : CP_DEFAULT_ARCH_CONFIG;
+        if (cp_arch_routes_load(routes) != 0) {
+            printf("Result: FAIL - architecture routes loading failed "
+                   "(see stderr).\n");
+            return 1;
+        }
+    }
+
     if (cli->token_text) return cmd_token(cli);
     if (cli->input_text) return cmd_generate(cli);
     return cmd_summary(cli);

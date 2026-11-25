@@ -4,12 +4,12 @@
  * Project : CPulse - C inference engine for Qwen2.5-0.5B
  * Stage   : 2 - weight loading
  *
- * Uses the standalone parser in json.h/json.c for the header and builds
- * the tensor metadata table from the parsed entries.
+ * Uses cJSON for the header and builds the tensor metadata table from
+ * the parsed entries.
  */
 
 #include "safetensors.h"
-#include "json.h"
+#include "cJSON.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -187,123 +187,65 @@ static int tensor_push(st_file_t *f, st_tensor_t t)
 }
 
 /*
- * Parse one tensor entry: an object with keys "dtype", "shape" and
- * "data_offsets" (any order). Unknown keys are skipped. `data_start` is the
- * absolute file offset of the data section (8 + header length), used to
- * convert the header's relative offsets into absolute ones.
- * Returns 0 on error.
+ * Fill one tensor entry from a cJSON object with keys "dtype", "shape"
+ * and "data_offsets". `data_start` is the absolute file offset of the
+ * data section (8 + header length). Returns 0 on error.
  */
-static int parse_tensor_entry(json_parser_t *j, st_tensor_t *t, size_t data_start)
+static int parse_tensor_entry(const cJSON *obj, st_tensor_t *t, size_t data_start)
 {
     memset(t, 0, sizeof(*t));
-    t->dtype = ST_DTYPE_COUNT; /* mark "not seen yet" */
+    t->dtype = ST_DTYPE_COUNT;
 
-    json_expect(j, '{');
-    if (j->err)
+    if (!cJSON_IsObject(obj))
         return 0;
 
-    int have_offsets = 0;
-    uint64_t begin = 0, end = 0;
-
-    int c = json_peek(j);
-    while (!j->err && c != '}')
-    {
-        char *key = json_parse_string(j, NULL);
-        if (j->err)
-            return 0;
-        json_expect(j, ':');
-
-        if (strcmp(key, "dtype") == 0)
-        {
-            char *dstr = json_parse_string(j, NULL);
-            if (!j->err)
-            {
-                t->dtype = dtype_from_string(dstr);
-                if (t->dtype == ST_DTYPE_COUNT)
-                {
-                    fprintf(stderr, "st_load: unknown dtype '%s'\n", dstr);
-                    j->err = 1;
-                }
-            }
-            free(dstr);
-        }
-        else if (strcmp(key, "shape") == 0)
-        {
-            json_expect(j, '[');
-            while (!j->err && json_peek(j) != ']')
-            {
-                uint64_t d = json_parse_uint(j);
-                if (j->err)
-                    break;
-                if (t->ndim >= ST_MAX_DIM)
-                {
-                    fprintf(stderr, "st_load: tensor rank > %d unsupported\n", ST_MAX_DIM);
-                    j->err = 1;
-                    break;
-                }
-                t->shape[t->ndim++] = (size_t)d;
-                int sep = json_peek(j);
-                if (sep == ',')
-                {
-                    j->p++;
-                }
-                else if (sep != ']')
-                {
-                    j->err = 1;
-                }
-            }
-            json_expect(j, ']');
-        }
-        else if (strcmp(key, "data_offsets") == 0)
-        {
-            json_expect(j, '[');
-            begin = json_parse_uint(j);
-            int sep = json_peek(j);
-            if (sep == ',')
-                j->p++;
-            end = json_parse_uint(j);
-            json_expect(j, ']');
-            have_offsets = 1;
-        }
-        else
-        {
-            json_skip_value(j); /* "__metadata__"-like or unknown extra field */
-        }
-
-        free(key);
-        if (j->err)
-            return 0;
-        c = json_peek(j);
-        if (c == ',')
-        {
-            j->p++;
-        }
-        else if (c != '}')
-        {
-            j->err = 1;
-        }
-    }
-    json_expect(j, '}');
-    if (j->err)
-        return 0;
-
-    if (t->dtype == ST_DTYPE_COUNT)
-    {
+    const cJSON *dtype = cJSON_GetObjectItemCaseSensitive(obj, "dtype");
+    if (!cJSON_IsString(dtype) || !dtype->valuestring) {
         fprintf(stderr, "st_load: tensor entry missing 'dtype'\n");
         return 0;
     }
-    if (t->ndim == 0)
-    {
+    t->dtype = dtype_from_string(dtype->valuestring);
+    if (t->dtype == ST_DTYPE_COUNT) {
+        fprintf(stderr, "st_load: unknown dtype '%s'\n", dtype->valuestring);
+        return 0;
+    }
+
+    const cJSON *shape = cJSON_GetObjectItemCaseSensitive(obj, "shape");
+    if (!cJSON_IsArray(shape)) {
         fprintf(stderr, "st_load: tensor entry missing 'shape'\n");
         return 0;
     }
-    if (!have_offsets)
-    {
+    const cJSON *dim = NULL;
+    cJSON_ArrayForEach(dim, shape) {
+        if (!cJSON_IsNumber(dim)) {
+            fprintf(stderr, "st_load: shape entry is not a number\n");
+            return 0;
+        }
+        if (t->ndim >= ST_MAX_DIM) {
+            fprintf(stderr, "st_load: tensor rank > %d unsupported\n", ST_MAX_DIM);
+            return 0;
+        }
+        t->shape[t->ndim++] = (size_t)dim->valuedouble;
+    }
+    if (t->ndim == 0) {
+        fprintf(stderr, "st_load: tensor entry missing 'shape'\n");
+        return 0;
+    }
+
+    const cJSON *offs = cJSON_GetObjectItemCaseSensitive(obj, "data_offsets");
+    if (!cJSON_IsArray(offs) || cJSON_GetArraySize(offs) < 2) {
         fprintf(stderr, "st_load: tensor entry missing 'data_offsets'\n");
         return 0;
     }
-    if (end < begin)
-    {
+    const cJSON *b = cJSON_GetArrayItem(offs, 0);
+    const cJSON *e = cJSON_GetArrayItem(offs, 1);
+    if (!cJSON_IsNumber(b) || !cJSON_IsNumber(e)) {
+        fprintf(stderr, "st_load: data_offsets must be numbers\n");
+        return 0;
+    }
+    uint64_t begin = (uint64_t)b->valuedouble;
+    uint64_t end = (uint64_t)e->valuedouble;
+    if (end < begin) {
         fprintf(stderr, "st_load: data_offsets end < begin\n");
         return 0;
     }
@@ -357,68 +299,45 @@ st_file_t *st_load(const char *path)
 
     /* parse the JSON header */
     size_t data_start = 8 + (size_t)hlen;
-    json_parser_t j = {(const char *)buf + 8, (const char *)buf + 8 + hlen, 0};
-
-    json_expect(&j, '{');
-    if (!j.err)
-    {
-        int c = json_peek(&j);
-        while (!j.err && c != '}')
-        {
-            char *name = json_parse_string(&j, NULL);
-            if (j.err)
-                break;
-            json_expect(&j, ':');
-
-            if (strcmp(name, "__metadata__") == 0)
-            {
-                json_skip_value(&j); /* optional file-level metadata: not needed */
-            }
-            else
-            {
-                st_tensor_t t;
-                if (!parse_tensor_entry(&j, &t, data_start))
-                {
-                    free(name);
-                    break;
-                }
-                t.name = name;
-                if (!tensor_push(f, t))
-                {
-                    fprintf(stderr, "st_load: out of memory growing table\n");
-                    free(name);
-                    j.err = 1;
-                    break;
-                }
-                name = NULL; /* ownership moved into the table */
-            }
-            free(name);
-
-            c = json_peek(&j);
-            if (c == ',')
-            {
-                j.p++;
-            }
-            else if (c != '}')
-            {
-                j.err = 1;
-            }
-        }
-    }
-
-    if (j.err)
+    cJSON *root = cJSON_ParseWithLength((const char *)buf + 8, (size_t)hlen);
+    if (!root || !cJSON_IsObject(root))
     {
         fprintf(stderr, "st_load: malformed safetensors header in '%s'\n", path);
+        cJSON_Delete(root);
         st_free(f);
         return NULL;
     }
-    json_expect(&j, '}');
-    if (j.err)
+
+    const cJSON *entry = NULL;
+    cJSON_ArrayForEach(entry, root)
     {
-        fprintf(stderr, "st_load: trailing garbage after header object\n");
-        st_free(f);
-        return NULL;
+        if (!entry->string)
+            continue;
+        if (strcmp(entry->string, "__metadata__") == 0)
+            continue; /* optional file-level metadata */
+
+        st_tensor_t t;
+        if (!parse_tensor_entry(entry, &t, data_start))
+        {
+            cJSON_Delete(root);
+            st_free(f);
+            return NULL;
+        }
+        {
+            size_t nlen = strlen(entry->string);
+            t.name = malloc(nlen + 1);
+            if (t.name) memcpy(t.name, entry->string, nlen + 1);
+        }
+        if (!t.name || !tensor_push(f, t))
+        {
+            fprintf(stderr, "st_load: out of memory growing table\n");
+            free(t.name);
+            cJSON_Delete(root);
+            st_free(f);
+            return NULL;
+        }
     }
+    cJSON_Delete(root);
 
     /* header parsed OK: one-line summary to stderr (tiny on purpose:
      * when stderr is a pipe, e.g. under a debugger, a burst can block) */

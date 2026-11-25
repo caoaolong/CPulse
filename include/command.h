@@ -19,8 +19,9 @@ extern "C" {
 
 typedef struct {
     const char *model_dir;
-    const char *input_text; /* NULL unless --input */
-    const char *token_text; /* NULL unless --token (takes priority) */
+    const char *arch_config; /* NULL => CP_DEFAULT_ARCH_CONFIG */
+    const char *input_text;  /* NULL unless --input */
+    const char *token_text;  /* NULL unless --token (takes priority) */
     int         max_new;
     int         use_gpu;
 } cp_cli_t;

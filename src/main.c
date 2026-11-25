@@ -21,16 +21,24 @@
 
 int main(int argc, char **argv) {
     cp_cli_t cli = {
-        .model_dir  = CP_DEFAULT_MODEL_DIR,
-        .input_text = NULL,
-        .token_text = NULL,
-        .max_new    = CP_DEFAULT_MAX_NEW,
-        .use_gpu    = 0,
+        .model_dir   = CP_DEFAULT_MODEL_DIR,
+        .arch_config = NULL,
+        .input_text  = NULL,
+        .token_text  = NULL,
+        .max_new     = CP_DEFAULT_MAX_NEW,
+        .use_gpu     = 0,
     };
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
             cli.model_dir = argv[++i];
+        } else if (strcmp(argv[i], "--arch-config") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --arch-config\n");
+                cp_cmd_help(argv[0]);
+                return 1;
+            }
+            cli.arch_config = argv[++i];
         } else if (strcmp(argv[i], "--input") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "missing value for --input\n");
