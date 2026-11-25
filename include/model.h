@@ -6,12 +6,15 @@
  *
  * Holds the architecture hyperparameters parsed from the model's
  * config.json, plus the derived values the forward pass needs
- * (head_dim, kv repeat factor). Validation rejects configs this
- * engine cannot run (wrong model type / activation / head layout).
+ * (arch id, head_dim, kv repeat factor). Validation routes model_type
+ * through cp_arch_resolve; stub arches fail early, implemented ones
+ * get full shape / activation checks.
  */
 
 #ifndef MODEL_H
 #define MODEL_H
+
+#include "arch.h"
 
 #include <stdint.h>
 
@@ -38,6 +41,7 @@ typedef struct {
     char     torch_dtype[16];
 
     /* derived (filled by cp_config_validate) */
+    cp_arch_id_t arch;    /* from model_type via cp_arch_resolve */
     uint32_t head_dim;    /* hidden_size / num_attention_heads */
     uint32_t kv_repeat;   /* num_attention_heads / num_key_value_heads (GQA) */
 } cp_config_t;

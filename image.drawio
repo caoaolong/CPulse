@@ -1,4 +1,4 @@
-<mxfile host="draw.codingsoul.space" pages="3">
+<mxfile host="draw.codingsoul.space" pages="6">
   <diagram name="SafeTensors" id="NxQ6BMrmUrDz2awR1G7n">
     <mxGraphModel dx="808" dy="444" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -1808,6 +1808,63 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="S60fPqVs5lSpY6PD-Trr" name="Encoder-only">
+    <mxGraphModel dx="1542" dy="850" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="s9xQ_BqQI3kzXgSweMDQ" name="Decoder-only">
+    <mxGraphModel dx="1542" dy="850" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="odz7PiOBtat4Ywo0aBmw" name="Encoder–Decoder">
+    <mxGraphModel dx="734" dy="405" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Comic Sans MS;" value="Input" vertex="1">
+          <mxGeometry height="40" width="160" x="240" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Comic Sans MS;verticalAlign=top;" value="Encoder" vertex="1">
+          <mxGeometry height="180" width="160" x="240" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-5" edge="1" parent="1" source="dJmxtstPuxEG1Hjv0Ilw-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="dJmxtstPuxEG1Hjv0Ilw-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="双向 Self-Attention" vertex="1">
+          <mxGeometry height="40" width="120" x="250" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="FFN" vertex="1">
+          <mxGeometry height="40" width="40" x="290" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-6" edge="1" parent="1" source="dJmxtstPuxEG1Hjv0Ilw-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="dJmxtstPuxEG1Hjv0Ilw-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="双向 Self-Attention" vertex="1">
+          <mxGeometry height="40" width="120" x="260" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="FFN" vertex="1">
+          <mxGeometry height="40" width="40" x="300" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-9" edge="1" parent="1" source="dJmxtstPuxEG1Hjv0Ilw-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="dJmxtstPuxEG1Hjv0Ilw-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="双向 Self-Attention" vertex="1">
+          <mxGeometry height="40" width="120" x="270" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="dJmxtstPuxEG1Hjv0Ilw-11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="FFN" vertex="1">
+          <mxGeometry height="40" width="40" x="310" y="330" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

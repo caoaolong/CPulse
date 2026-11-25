@@ -21,6 +21,7 @@
  */
 
 #include "forward.h"
+#include "arch.h"
 #include "ops.h"
 #include "gpu.h"
 
@@ -53,6 +54,12 @@ static void add_bias(float *y, const uint8_t *bias, size_t n) {
 int cp_forward_init(cp_forward_t **out, const cp_config_t *cfg,
                     const cp_weights_t *w, int use_gpu) {
     if (!out || !cfg || !w || !w->layers || cfg->num_hidden_layers == 0) {
+        return -1;
+    }
+    if (cfg->arch != CP_ARCH_QWEN2) {
+        fprintf(stderr,
+                "cp_forward: not implemented for arch '%s' (model_type='%s')\n",
+                cp_arch_name(cfg->arch), cfg->model_type);
         return -1;
     }
     *out = NULL;

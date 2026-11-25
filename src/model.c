@@ -10,6 +10,7 @@
  */
 
 #include "model.h"
+#include "arch.h"
 #include "json.h"
 
 #include <stdio.h>
@@ -41,14 +42,33 @@ static void copy_str(char *dst, size_t cap, char *src) {
 }
 
 static int cp_config_validate(cp_config_t *c, unsigned seen) {
+    if (!(seen & REQ_MODEL_TYPE) || c->model_type[0] == '\0') {
+        fprintf(stderr, "cp_config: missing required key 'model_type'\n");
+        return -1;
+    }
+
+    /* Architecture routing: resolve first so stub arches fail clearly
+     * without demanding Qwen2-only hyperparameters. */
+    const cp_arch_t *arch = cp_arch_resolve(c->model_type);
+    if (!arch) {
+        fprintf(stderr, "cp_config: unknown model_type '%s'\n", c->model_type);
+        cp_arch_print_registry(stderr);
+        return -1;
+    }
+    c->arch = arch->id;
+
+    if (!arch->implemented) {
+        fprintf(stderr,
+                "cp_config: architecture '%s' (%s) recognized from "
+                "model_type='%s', but not implemented yet\n",
+                arch->name, arch->family, c->model_type);
+        return -1;
+    }
+
+    /* Implemented path (currently Qwen2 only): full shape checks. */
     if (seen != REQ_ALL) {
         fprintf(stderr, "cp_config: missing required keys (seen=0x%x, want=0x%x)\n",
                 seen, REQ_ALL);
-        return -1;
-    }
-    if (strcmp(c->model_type, "qwen2") != 0) {
-        fprintf(stderr, "cp_config: unsupported model_type '%s' (want 'qwen2')\n",
-                c->model_type);
         return -1;
     }
     if (strcmp(c->hidden_act, "silu") != 0) {
@@ -61,7 +81,8 @@ static int cp_config_validate(cp_config_t *c, unsigned seen) {
                 c->hidden_size, c->num_attention_heads);
         return -1;
     }
-    if (c->num_attention_heads % c->num_key_value_heads != 0) {
+    if (c->num_key_value_heads == 0 ||
+        c->num_attention_heads % c->num_key_value_heads != 0) {
         fprintf(stderr, "cp_config: %u q-heads not divisible by %u kv-heads (GQA)\n",
                 c->num_attention_heads, c->num_key_value_heads);
         return -1;
@@ -188,8 +209,9 @@ int cp_config_load(const char *path, cp_config_t *out) {
 
 void cp_config_print(const cp_config_t *c) {
     printf("Config:\n");
-    printf("  model_type=%s hidden_act=%s torch_dtype=%s tie_emb=%d\n",
-           c->model_type, c->hidden_act, c->torch_dtype, c->tie_word_embeddings);
+    printf("  model_type=%s arch=%s hidden_act=%s torch_dtype=%s tie_emb=%d\n",
+           c->model_type, cp_arch_name(c->arch), c->hidden_act, c->torch_dtype,
+           c->tie_word_embeddings);
     printf("  vocab=%u hidden=%u inter=%u layers=%u\n",
            c->vocab_size, c->hidden_size, c->intermediate_size, c->num_hidden_layers);
     printf("  heads q=%u kv=%u (head_dim=%u, kv_repeat=%u) max_pos=%u\n",

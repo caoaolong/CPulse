@@ -9,7 +9,6 @@
 
 #include "tokenizer.h"
 #include "json.h"
-#include "log.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -433,15 +432,7 @@ int cp_tok_load(cp_tok_t **out, const char *model_dir) {
 
     fprintf(stdout, "tok: vocab=%zu merges=%zu specials=%zu ids=%zu\n",
             t->vocab.n, t->merges.n, t->n_spec, t->n_ids);
-    if (cp_log_on()) {
-        cp_log_begin("tok");
-        cp_log_u("vocab", t->vocab.n);
-        cp_log_u("merges", t->merges.n);
-        cp_log_u("specials", t->n_spec);
-        cp_log_u("ids", t->n_ids);
-        cp_log_end();
-    }
-    *out = t;
+        *out = t;
     return 0;
 
 fail:
@@ -653,16 +644,8 @@ static void sym_free(sym_t *s, size_t n) {
 
 /* encode one pre-token span; appends ids, *pn updated */
 static int bpe_encode(const cp_tok_t *t, const char *s, size_t n,
-                      uint32_t *out, size_t *pn, size_t cap,
-                      unsigned long pre) {
+                      uint32_t *out, size_t *pn, size_t cap) {
     if (n == 0) return 0;
-    if (cp_log_on()) {
-        cp_log_begin("bytes");
-        cp_log_u("pretoken", pre);
-        cp_log_u("len", n);
-        cp_log_h("hex", (const uint8_t *)s, n);
-        cp_log_end();
-    }
     sym_t *sym = malloc((n + 1) * sizeof *sym);
     uint32_t *rk = malloc((n + 1) * sizeof *rk);
     if (!sym || !rk) { free(sym); free(rk); return -1; }
@@ -690,16 +673,7 @@ static int bpe_encode(const cp_tok_t *t, const char *s, size_t n,
         sym[nsym].len = (uint32_t)L;
         nsym++;
     }
-    if (cp_log_on()) {
-        for (size_t i = 0; i < nsym; i++) {
-            cp_log_begin("symbol");
-            cp_log_u("pretoken", pre);
-            cp_log_u("index", i);
-            cp_log_s("text", sym[i].p, sym[i].len);
-            cp_log_end();
-        }
-    }
-    for (size_t i = 0; i + 1 < nsym; i++) {
+        for (size_t i = 0; i + 1 < nsym; i++) {
         if (pair_rank(t, sym[i].p, sym[i].len,
                       sym[i + 1].p, sym[i + 1].len, &rk[i]) != 0)
             rk[i] = 0xFFFFFFFFu;
@@ -718,16 +692,7 @@ static int bpe_encode(const cp_tok_t *t, const char *s, size_t n,
         memcpy(np, sym[best].p, sym[best].len);
         memcpy(np + sym[best].len, sym[best + 1].p, sym[best + 1].len);
         np[nl] = '\0';
-        if (cp_log_on()) {
-            cp_log_begin("merge");
-            cp_log_u("pretoken", pre);
-            cp_log_u("rank", best_rank);
-            cp_log_s("left", sym[best].p, sym[best].len);
-            cp_log_s("right", sym[best + 1].p, sym[best + 1].len);
-            cp_log_s("merged", np, nl);
-            cp_log_end();
-        }
-        free(sym[best].p);
+                free(sym[best].p);
         free(sym[best + 1].p);
         sym[best].p = np;
         sym[best].len = (uint32_t)nl;
@@ -760,15 +725,7 @@ static int bpe_encode(const cp_tok_t *t, const char *s, size_t n,
         }
         if (*pn >= cap) { rc = -1; break; }
         out[(*pn)++] = id;
-        if (cp_log_on()) {
-            cp_log_begin("piece");
-            cp_log_u("pretoken", pre);
-            cp_log_u("index", i);
-            cp_log_s("text", sym[i].p, sym[i].len);
-            cp_log_u("id", id);
-            cp_log_end();
-        }
-    }
+            }
     sym_free(sym, nsym);
     free(rk);
     return rc;
@@ -792,12 +749,7 @@ int cp_tok_lookup(const cp_tok_t *t, const char *text, uint32_t *out) {
 int cp_tok_encode(const cp_tok_t *t, const char *text,
                   uint32_t *out, size_t cap) {
     if (!t || !text || (!out && cap > 0)) return -1;
-    size_t n = strlen(text), p = 0, count = 0, pi = 0;
-    if (cp_log_on()) {
-        cp_log_begin("encode");
-        cp_log_s("text", text, n);
-        cp_log_end();
-    }
+    size_t n = strlen(text), p = 0, count = 0;
     while (p < n) {
         size_t hit = 0;
         uint32_t hid = 0;
@@ -812,30 +764,13 @@ int cp_tok_encode(const cp_tok_t *t, const char *text,
         if (hit > 0) {
             if (count >= cap) return -1;
             out[count++] = hid;
-            if (cp_log_on()) {
-                cp_log_begin("special");
-                cp_log_u("id", hid);
-                cp_log_u("pos", p);
-                cp_log_u("len", hit);
-                cp_log_s("text", text + p, hit);
-                cp_log_end();
-            }
             p += hit;
             continue;
         }
         size_t e = p + next_pretoken(text + p, n - p);
-        if (cp_log_on()) {
-            cp_log_begin("pretoken");
-            cp_log_u("index", pi);
-            cp_log_u("pos", p);
-            cp_log_u("len", e - p);
-            cp_log_s("text", text + p, e - p);
-            cp_log_end();
-        }
-        if (bpe_encode(t, text + p, e - p, out, &count, cap, pi) != 0)
+        if (bpe_encode(t, text + p, e - p, out, &count, cap) != 0)
             return -1;
         p = e;
-        pi++;
     }
     return (int)count;
 }

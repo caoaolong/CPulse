@@ -1,18 +1,19 @@
 <#
 .SYNOPSIS
-    Download the Qwen2.5-0.5B model from ModelScope into the project's .cache directory.
+    Download a model from ModelScope or Hugging Face into the project's .cache directory.
 
 .DESCRIPTION
-    This script clones the Qwen2.5-0.5B model repository from ModelScope using
-    git + git-lfs (shallow clone) and places it under:
-        <ProjectRoot>\.cache\Qwen2.5-0.5B
+    Clones a model repository with git + git-lfs (shallow clone) into:
+        <ProjectRoot>\.cache\<ModelName>
 
-    It is the first step of the C-language LLM inference engine project,
-    preparing the experimental model weights for later loading in C.
+    <ModelName> is the last segment of -ModelRepo (e.g. Qwen/Qwen2.5-0.5B -> Qwen2.5-0.5B).
 
 .PARAMETER ModelRepo
-    ModelScope repository path in "Owner/Name" format.
+    Repository path in "Owner/Name" format.
     Default: "Qwen/Qwen2.5-0.5B"
+
+.PARAMETER Source
+    Download mirror: "modelscope" (default) or "huggingface".
 
 .PARAMETER SkipExisting
     If set, reuse an already-downloaded model directory without re-cloning.
@@ -29,12 +30,17 @@
     powershell -ExecutionPolicy Bypass -File .\download_model.ps1 -Proxy http://127.0.0.1:7890
 
 .EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\download_model.ps1 -Source huggingface -ModelRepo google-t5/t5-small -Proxy http://127.0.0.1:7890
+
+.EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\download_model.ps1 -SkipExisting
 #>
 
 [CmdletBinding()]
 param(
     [string]$ModelRepo = "Qwen/Qwen2.5-0.5B",
+    [ValidateSet("modelscope", "huggingface")]
+    [string]$Source = "modelscope",
     [switch]$SkipExisting,
     [string]$Proxy = ""
 )
@@ -69,15 +75,33 @@ function Write-Err([string]$msg) {
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $CacheDir    = Join-Path $ProjectRoot ".cache"
-$ModelDir    = Join-Path $CacheDir "Qwen2.5-0.5B"
+
+if ($ModelRepo -notmatch '^[^/\\]+/[^/\\]+$') {
+    Write-Err "ModelRepo must be in Owner/Name format, got: $ModelRepo"
+    exit 1
+}
+$ModelName = Split-Path -Leaf ($ModelRepo -replace '\\', '/')
+$ModelDir  = Join-Path $CacheDir $ModelName
+
+switch ($Source.ToLowerInvariant()) {
+    "modelscope"  { $cloneUrl = "https://www.modelscope.cn/$ModelRepo.git" }
+    "huggingface" { $cloneUrl = "https://huggingface.co/$ModelRepo" }
+    default {
+        Write-Err "Unsupported Source: $Source (use modelscope or huggingface)"
+        exit 1
+    }
+}
+
+$sourceLabel = if ($Source -eq "huggingface") { "Hugging Face" } else { "ModelScope" }
 
 Write-Host "==========================================================" -ForegroundColor DarkGray
-Write-Host "  Qwen2.5-0.5B Model Downloader (ModelScope)" -ForegroundColor White
+Write-Host "  Model Downloader ($sourceLabel)" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor DarkGray
 Write-Host "  Project root : $ProjectRoot"
 Write-Host "  Cache dir    : $CacheDir"
 Write-Host "  Model dir    : $ModelDir"
 Write-Host "  Model repo   : $ModelRepo"
+Write-Host "  Source       : $Source"
 Write-Host "==========================================================" -ForegroundColor DarkGray
 
 # ---------------------------------------------------------------------------
@@ -168,18 +192,19 @@ if ($Proxy) {
     Write-Host "  Proxy: (none, direct connection)" -ForegroundColor DarkGray
 }
 
-$cloneUrl = "https://www.modelscope.cn/$ModelRepo.git"
-
-Write-Step "Cloning model from ModelScope (shallow clone)..."
+Write-Step "Cloning model from $sourceLabel (shallow clone)..."
 Write-Host "  URL : $cloneUrl"
 Write-Host "  DIR : $ModelDir"
-Write-Host "  This may take a while depending on your network and model size (~1 GB)."
+Write-Host "  This may take a while depending on your network and model size."
 Write-Host ""
 
 try {
     # --depth 1 : shallow clone (we only need the latest snapshot)
     # --no-tags : skip tags to save time
     git @gitProxyArgs clone --depth 1 --no-tags --progress $cloneUrl $ModelDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "git clone exited with code $LASTEXITCODE"
+    }
 } catch {
     Write-Err "git clone failed: $_"
     exit 1
@@ -202,7 +227,7 @@ $weightFiles = Get-ChildItem -Path $ModelDir -Recurse -Include *.safetensors, *.
 if (-not $weightFiles -or $weightFiles.Count -eq 0) {
     Write-Err "No weight files (.safetensors / .bin) found. git-lfs files may not have been fetched."
     if ($Proxy) { Write-Warn "You cloned with a proxy; export it first: `$env:HTTPS_PROXY = `"$Proxy`"" }
-    Write-Warn "Try running: git -C $ModelDir lfs pull"
+    Write-Warn "Try running: git -C `"$ModelDir`" lfs pull"
     exit 1
 }
 
@@ -219,7 +244,7 @@ if ($pointerFiles.Count -gt 0) {
     Write-Err "Found $($pointerFiles.Count) LFS pointer file(s) instead of real weights:"
     foreach ($pf in $pointerFiles) { Write-Host "    - $($pf.FullName)" }
     if ($Proxy) { Write-Warn "You cloned with a proxy; export it first: `$env:HTTPS_PROXY = `"$Proxy`"" }
-    Write-Warn "Run: git -C $ModelDir lfs pull --force"
+    Write-Warn "Run: git -C `"$ModelDir`" lfs pull --force"
     exit 1
 }
 
@@ -235,6 +260,7 @@ Write-Host ""
 Write-Host "==========================================================" -ForegroundColor DarkGray
 Write-Host "  Download complete" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor DarkGray
+Write-Host "  Source       : $Source"
 Write-Host "  Location     : $ModelDir"
 Write-Host "  Files        : $($allFiles.Count)"
 Write-Host "  Total size   : $([math]::Round($totalSize / 1MB, 2)) MB"
@@ -256,4 +282,4 @@ foreach ($pat in $keyPatterns) {
 }
 Write-Host "==========================================================" -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "Next step: implement the C inference engine that loads these weights." -ForegroundColor White
+Write-Host "Next: point CPulse at this directory, e.g. --model `"$ModelDir`"" -ForegroundColor White
