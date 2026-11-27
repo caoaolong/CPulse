@@ -1,54 +1,66 @@
 /*
- * weights.c - weight binding (see weights.h)
- *
- * Every expected tensor is looked up by its HuggingFace name and checked
- * against the config-derived shape. Anything off fails the bind: later
- * stages must be able to trust these pointers blindly.
+ * weights.c - Qwen weight binding via bind recipe (see weights.h)
  */
 
 #include "qwen/weights.h"
 #include "arch.h"
+#include "bind_recipe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Look up one tensor and verify dtype + shape. NULL (counted) on any problem. */
-static const st_tensor_t *expect(
-        const st_file_t *f, const char *name,
-        st_dtype_t dtype, size_t ndim, const size_t *shape,
-        size_t *n_bound, size_t *n_expected) {
-    (*n_expected)++;
-    const st_tensor_t *t = st_find(f, name);
-    if (!t) {
-        fprintf(stderr, "cp_weights: [MISS] %-46s not in file\n", name);
-        return NULL;
-    }
-    if (t->dtype != dtype) {
-        fprintf(stderr, "cp_weights: [DTYPE] %-46s is %s, want %s\n",
-                name, st_dtype_name(t->dtype), st_dtype_name(dtype));
-        return NULL;
-    }
-    if (t->ndim != ndim) {
-        fprintf(stderr, "cp_weights: [RANK] %-46s ndim=%zu, want %zu\n",
-                name, t->ndim, ndim);
-        return NULL;
-    }
-    for (size_t d = 0; d < ndim; d++) {
-        if (t->shape[d] != shape[d]) {
-            fprintf(stderr, "cp_weights: [SHAPE] %-46s dim%zu=%zu, want %zu\n",
-                    name, d, t->shape[d], shape[d]);
-            return NULL;
-        }
-    }
-    (*n_bound)++;
-    return t;
+static const st_tensor_t **qwen_global_slot(cp_weights_t *w, const char *field) {
+    if (strcmp(field, "embed_tokens") == 0) return &w->embed_tokens;
+    if (strcmp(field, "final_norm") == 0) return &w->final_norm;
+    if (strcmp(field, "lm_head") == 0) return &w->lm_head;
+    return NULL;
 }
 
-#define EXPECT2(f, n, dt, a, b, nb, ne) \
-    expect(f, n, dt, 2, ((const size_t[]){ (a), (b) }), nb, ne)
-#define EXPECT1(f, n, dt, a, nb, ne) \
-    expect(f, n, dt, 1, ((const size_t[]){ (a) }), nb, ne)
+static const st_tensor_t **qwen_layer_slot(cp_layer_w_t *lw, const char *field) {
+    if (strcmp(field, "input_ln") == 0) return &lw->input_ln;
+    if (strcmp(field, "q_w") == 0) return &lw->q_w;
+    if (strcmp(field, "q_b") == 0) return &lw->q_b;
+    if (strcmp(field, "k_w") == 0) return &lw->k_w;
+    if (strcmp(field, "k_b") == 0) return &lw->k_b;
+    if (strcmp(field, "v_w") == 0) return &lw->v_w;
+    if (strcmp(field, "v_b") == 0) return &lw->v_b;
+    if (strcmp(field, "o_w") == 0) return &lw->o_w;
+    if (strcmp(field, "post_ln") == 0) return &lw->post_ln;
+    if (strcmp(field, "gate_w") == 0) return &lw->gate_w;
+    if (strcmp(field, "up_w") == 0) return &lw->up_w;
+    if (strcmp(field, "down_w") == 0) return &lw->down_w;
+    return NULL;
+}
+
+static int bind_one(const st_file_t *f, const char *tag, st_dtype_t dt,
+                    const cp_bind_dims_t *dims, const cp_bind_tensor_spec_t *spec,
+                    uint32_t layer, const char *prefix,
+                    const st_tensor_t **slot,
+                    size_t *n_bound, size_t *n_expected) {
+    if (!cp_bind_spec_active(spec, dims, (int)layer)) return 1;
+    if (!slot) {
+        fprintf(stderr, "%s: unknown field '%s'\n", tag, spec->field);
+        return 0;
+    }
+
+    size_t shape[CP_BIND_MAX_DIM];
+    int ndim = cp_bind_resolve_shape(dims, spec, shape);
+    if (ndim < 0) return 0;
+
+    char full[CP_BIND_NAME_MAX * 2];
+    if (prefix && prefix[0]) {
+        char leaf[CP_BIND_NAME_MAX];
+        cp_bind_expand_name(leaf, sizeof leaf, spec->name, layer);
+        snprintf(full, sizeof full, "%s%s", prefix, leaf);
+    } else {
+        cp_bind_expand_name(full, sizeof full, spec->name, layer);
+    }
+
+    *slot = cp_bind_expect(f, tag, full, dt, (size_t)ndim, shape,
+                           n_bound, n_expected);
+    return *slot != NULL;
+}
 
 int cp_weights_bind(const cp_config_t *cfg, const st_file_t *f, cp_weights_t *out) {
     memset(out, 0, sizeof(*out));
@@ -60,67 +72,79 @@ int cp_weights_bind(const cp_config_t *cfg, const st_file_t *f, cp_weights_t *ou
                 cp_arch_name(cfg->arch), cfg->model_type);
         return -1;
     }
-    out->tied_head = cfg->tie_word_embeddings ? 1 : 0;
 
-    const st_dtype_t dt = ST_DTYPE_BF16;
-    const uint32_t H = cfg->hidden_size;
-    const uint32_t I = cfg->intermediate_size;
-    const uint32_t V = cfg->vocab_size;
-    const uint32_t kv_dim = cfg->head_dim * cfg->num_key_value_heads;
+    cp_bind_recipe_t recipe;
+    if (cp_bind_recipe_load(NULL, cfg->model_type, &recipe) != 0)
+        return -1;
+
+    cp_bind_dims_t dims;
+    memset(&dims, 0, sizeof dims);
+    dims.vocab_size = cfg->vocab_size;
+    dims.hidden_size = cfg->hidden_size;
+    dims.intermediate_size = cfg->intermediate_size;
+    dims.kv_dim = cfg->head_dim * cfg->num_key_value_heads;
+    dims.num_hidden_layers = cfg->num_hidden_layers;
+    dims.tied_head = cfg->tie_word_embeddings ? 1 : 0;
+    out->tied_head = dims.tied_head;
+
+    st_dtype_t dt = cp_bind_resolve_dtype(&recipe, f);
+    if (dt == ST_DTYPE_COUNT) {
+        fprintf(stderr, "cp_weights: cannot resolve dtype from recipe\n");
+        cp_bind_recipe_free(&recipe);
+        return -1;
+    }
 
     size_t n_bound = 0, n_expected = 0;
     int ok = 1;
+    const char *tag = "cp_weights";
 
-    out->embed_tokens = EXPECT2(f, "model.embed_tokens.weight", dt, V, H, &n_bound, &n_expected);
-    ok &= out->embed_tokens != NULL;
+    for (size_t i = 0; i < recipe.n_globals; i++) {
+        const cp_bind_tensor_spec_t *spec = &recipe.globals[i];
+        const st_tensor_t **slot = qwen_global_slot(out, spec->field);
+        if (!bind_one(f, tag, dt, &dims, spec, 0, NULL, slot,
+                      &n_bound, &n_expected))
+            ok = 0;
+    }
 
-    out->layers = calloc(cfg->num_hidden_layers, sizeof(cp_layer_w_t));
-    if (!out->layers) {
-        fprintf(stderr, "cp_weights: out of memory\n");
+    size_t n_layers = 0;
+    if (cp_bind_resolve_sym(&dims, recipe.layers.count_sym, &n_layers) != 0) {
+        cp_bind_recipe_free(&recipe);
         return -1;
     }
-    out->n_layers = cfg->num_hidden_layers;
+    out->layers = calloc(n_layers, sizeof(cp_layer_w_t));
+    if (!out->layers) {
+        fprintf(stderr, "cp_weights: out of memory\n");
+        cp_bind_recipe_free(&recipe);
+        return -1;
+    }
+    out->n_layers = (uint32_t)n_layers;
 
-    char name[128];
-    for (uint32_t L = 0; L < cfg->num_hidden_layers; L++) {
+    for (uint32_t L = 0; L < out->n_layers; L++) {
+        char prefix[CP_BIND_NAME_MAX];
+        cp_bind_expand_name(prefix, sizeof prefix, recipe.layers.prefix, L);
         cp_layer_w_t *lw = &out->layers[L];
-#define LN(suffix, field, ...) \
-        do { \
-            snprintf(name, sizeof(name), "model.layers.%u." suffix, L); \
-            lw->field = __VA_ARGS__; \
-            ok &= lw->field != NULL; \
-        } while (0)
-        LN("input_layernorm.weight", input_ln, EXPECT1(f, name, dt, H, &n_bound, &n_expected));
-        LN("self_attn.q_proj.weight", q_w, EXPECT2(f, name, dt, H, H, &n_bound, &n_expected));
-        LN("self_attn.q_proj.bias", q_b, EXPECT1(f, name, dt, H, &n_bound, &n_expected));
-        LN("self_attn.k_proj.weight", k_w, EXPECT2(f, name, dt, kv_dim, H, &n_bound, &n_expected));
-        LN("self_attn.k_proj.bias", k_b, EXPECT1(f, name, dt, kv_dim, &n_bound, &n_expected));
-        LN("self_attn.v_proj.weight", v_w, EXPECT2(f, name, dt, kv_dim, H, &n_bound, &n_expected));
-        LN("self_attn.v_proj.bias", v_b, EXPECT1(f, name, dt, kv_dim, &n_bound, &n_expected));
-        LN("self_attn.o_proj.weight", o_w, EXPECT2(f, name, dt, H, H, &n_bound, &n_expected));
-        LN("post_attention_layernorm.weight", post_ln, EXPECT1(f, name, dt, H, &n_bound, &n_expected));
-        LN("mlp.gate_proj.weight", gate_w, EXPECT2(f, name, dt, I, H, &n_bound, &n_expected));
-        LN("mlp.up_proj.weight", up_w, EXPECT2(f, name, dt, I, H, &n_bound, &n_expected));
-        LN("mlp.down_proj.weight", down_w, EXPECT2(f, name, dt, H, I, &n_bound, &n_expected));
-#undef LN
+        for (size_t i = 0; i < recipe.layers.n_tensors; i++) {
+            const cp_bind_tensor_spec_t *spec = &recipe.layers.tensors[i];
+            const st_tensor_t **slot = qwen_layer_slot(lw, spec->field);
+            if (!bind_one(f, tag, dt, &dims, spec, L, prefix, slot,
+                          &n_bound, &n_expected))
+                ok = 0;
+        }
     }
 
-    out->final_norm = EXPECT1(f, "model.norm.weight", dt, H, &n_bound, &n_expected);
-    ok &= out->final_norm != NULL;
-
     if (out->tied_head) {
-        /* tied: no separate tensor; alias embed so forward code is uniform */
         out->lm_head = out->embed_tokens;
         if (st_find(f, "lm_head.weight")) {
-            fprintf(stderr, "cp_weights: [WARN] tie_word_embeddings=1 but lm_head.weight exists; using embed\n");
+            fprintf(stderr,
+                    "cp_weights: [WARN] tie_word_embeddings=1 but "
+                    "lm_head.weight exists; using embed\n");
         }
-    } else {
-        out->lm_head = EXPECT2(f, "lm_head.weight", dt, V, H, &n_bound, &n_expected);
-        ok &= out->lm_head != NULL;
     }
 
     out->n_bound = n_bound;
     out->n_expected = n_expected;
+    cp_bind_recipe_free(&recipe);
+
     if (!ok) {
         cp_weights_free(out);
         memset(out, 0, sizeof(*out));

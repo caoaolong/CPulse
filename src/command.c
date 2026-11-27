@@ -15,6 +15,7 @@
 #include "t5/config.h"
 #include "t5/weights.h"
 #include "tok/tokenizer.h"
+#include "bind_recipe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -483,7 +484,7 @@ static int cmd_generate(const cp_cli_t *cli) {
 int cp_command_run(const cp_cli_t *cli) {
     if (!cli || !cli->model_dir) return 1;
 
-    /* Unified routes: arch section + tokenizer section from one file. */
+    /* Unified routes: arch + tokenizer (+ bind recipes on demand). */
     {
         const char *routes = cli->routes_path ? cli->routes_path
                                               : CP_DEFAULT_ROUTES;
@@ -497,6 +498,7 @@ int cp_command_run(const cp_cli_t *cli) {
                    "see stderr).\n");
             return 1;
         }
+        cp_bind_set_routes_path(routes);
     }
 
     if (cli->view_path) return cmd_view(cli);

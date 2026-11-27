@@ -37,5 +37,272 @@
       "XLNetTokenizer",
       "ReformerTokenizer"
     ]
+  },
+  "bind": {
+    "qwen2": {
+      "dtype": "BF16",
+      "tied_head_from_config": true,
+      "globals": [
+        {
+          "name": "model.embed_tokens.weight",
+          "field": "embed_tokens",
+          "shape": ["vocab_size", "hidden_size"]
+        },
+        {
+          "name": "model.norm.weight",
+          "field": "final_norm",
+          "shape": ["hidden_size"]
+        },
+        {
+          "name": "lm_head.weight",
+          "field": "lm_head",
+          "shape": ["vocab_size", "hidden_size"],
+          "if_not_tied": true
+        }
+      ],
+      "layers": {
+        "count": "num_hidden_layers",
+        "prefix": "model.layers.{L}.",
+        "tensors": [
+          {
+            "name": "input_layernorm.weight",
+            "field": "input_ln",
+            "shape": ["hidden_size"]
+          },
+          {
+            "name": "self_attn.q_proj.weight",
+            "field": "q_w",
+            "shape": ["hidden_size", "hidden_size"]
+          },
+          {
+            "name": "self_attn.q_proj.bias",
+            "field": "q_b",
+            "shape": ["hidden_size"]
+          },
+          {
+            "name": "self_attn.k_proj.weight",
+            "field": "k_w",
+            "shape": ["kv_dim", "hidden_size"]
+          },
+          {
+            "name": "self_attn.k_proj.bias",
+            "field": "k_b",
+            "shape": ["kv_dim"]
+          },
+          {
+            "name": "self_attn.v_proj.weight",
+            "field": "v_w",
+            "shape": ["kv_dim", "hidden_size"]
+          },
+          {
+            "name": "self_attn.v_proj.bias",
+            "field": "v_b",
+            "shape": ["kv_dim"]
+          },
+          {
+            "name": "self_attn.o_proj.weight",
+            "field": "o_w",
+            "shape": ["hidden_size", "hidden_size"]
+          },
+          {
+            "name": "post_attention_layernorm.weight",
+            "field": "post_ln",
+            "shape": ["hidden_size"]
+          },
+          {
+            "name": "mlp.gate_proj.weight",
+            "field": "gate_w",
+            "shape": ["intermediate_size", "hidden_size"]
+          },
+          {
+            "name": "mlp.up_proj.weight",
+            "field": "up_w",
+            "shape": ["intermediate_size", "hidden_size"]
+          },
+          {
+            "name": "mlp.down_proj.weight",
+            "field": "down_w",
+            "shape": ["hidden_size", "intermediate_size"]
+          }
+        ]
+      }
+    },
+    "t5": {
+      "dtype_from": "shared.weight",
+      "globals": [
+        {
+          "name": "shared.weight",
+          "field": "shared",
+          "shape": ["vocab_size", "d_model"]
+        },
+        {
+          "name": "encoder.final_layer_norm.weight",
+          "field": "enc_final_ln",
+          "shape": ["d_model"]
+        },
+        {
+          "name": "decoder.final_layer_norm.weight",
+          "field": "dec_final_ln",
+          "shape": ["d_model"]
+        }
+      ],
+      "encoder_layers": {
+        "count": "num_layers",
+        "prefix": "encoder.block.{L}.",
+        "tensors": [
+          {
+            "name": "layer.0.SelfAttention.q.weight",
+            "field": "enc_self_q",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.0.SelfAttention.k.weight",
+            "field": "enc_self_k",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.0.SelfAttention.v.weight",
+            "field": "enc_self_v",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.0.SelfAttention.o.weight",
+            "field": "enc_self_o",
+            "shape": ["d_model", "inner_dim"]
+          },
+          {
+            "name": "layer.0.SelfAttention.relative_attention_bias.weight",
+            "field": "enc_self_rel_bias",
+            "shape": ["rel_buckets", "num_heads"],
+            "only_layer": 0
+          },
+          {
+            "name": "layer.0.layer_norm.weight",
+            "field": "enc_ln_self",
+            "shape": ["d_model"]
+          },
+          {
+            "name": "layer.1.DenseReluDense.wi.weight",
+            "field": "enc_ff_wi",
+            "shape": ["d_ff", "d_model"],
+            "if_gated": false
+          },
+          {
+            "name": "layer.1.DenseReluDense.wi_0.weight",
+            "field": "enc_ff_wi_0",
+            "shape": ["d_ff", "d_model"],
+            "if_gated": true
+          },
+          {
+            "name": "layer.1.DenseReluDense.wi_1.weight",
+            "field": "enc_ff_wi_1",
+            "shape": ["d_ff", "d_model"],
+            "if_gated": true
+          },
+          {
+            "name": "layer.1.DenseReluDense.wo.weight",
+            "field": "enc_ff_wo",
+            "shape": ["d_model", "d_ff"]
+          },
+          {
+            "name": "layer.1.layer_norm.weight",
+            "field": "enc_ln_ff",
+            "shape": ["d_model"]
+          }
+        ]
+      },
+      "decoder_layers": {
+        "count": "num_decoder_layers",
+        "prefix": "decoder.block.{L}.",
+        "tensors": [
+          {
+            "name": "layer.0.SelfAttention.q.weight",
+            "field": "dec_self_q",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.0.SelfAttention.k.weight",
+            "field": "dec_self_k",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.0.SelfAttention.v.weight",
+            "field": "dec_self_v",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.0.SelfAttention.o.weight",
+            "field": "dec_self_o",
+            "shape": ["d_model", "inner_dim"]
+          },
+          {
+            "name": "layer.0.SelfAttention.relative_attention_bias.weight",
+            "field": "dec_self_rel_bias",
+            "shape": ["rel_buckets", "num_heads"],
+            "only_layer": 0
+          },
+          {
+            "name": "layer.0.layer_norm.weight",
+            "field": "dec_ln_self",
+            "shape": ["d_model"]
+          },
+          {
+            "name": "layer.1.EncDecAttention.q.weight",
+            "field": "dec_cross_q",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.1.EncDecAttention.k.weight",
+            "field": "dec_cross_k",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.1.EncDecAttention.v.weight",
+            "field": "dec_cross_v",
+            "shape": ["inner_dim", "d_model"]
+          },
+          {
+            "name": "layer.1.EncDecAttention.o.weight",
+            "field": "dec_cross_o",
+            "shape": ["d_model", "inner_dim"]
+          },
+          {
+            "name": "layer.1.layer_norm.weight",
+            "field": "dec_ln_cross",
+            "shape": ["d_model"]
+          },
+          {
+            "name": "layer.2.DenseReluDense.wi.weight",
+            "field": "dec_ff_wi",
+            "shape": ["d_ff", "d_model"],
+            "if_gated": false
+          },
+          {
+            "name": "layer.2.DenseReluDense.wi_0.weight",
+            "field": "dec_ff_wi_0",
+            "shape": ["d_ff", "d_model"],
+            "if_gated": true
+          },
+          {
+            "name": "layer.2.DenseReluDense.wi_1.weight",
+            "field": "dec_ff_wi_1",
+            "shape": ["d_ff", "d_model"],
+            "if_gated": true
+          },
+          {
+            "name": "layer.2.DenseReluDense.wo.weight",
+            "field": "dec_ff_wo",
+            "shape": ["d_model", "d_ff"]
+          },
+          {
+            "name": "layer.2.layer_norm.weight",
+            "field": "dec_ln_ff",
+            "shape": ["d_model"]
+          }
+        ]
+      }
+    },
+    "mt5": "t5",
+    "flan-t5": "t5"
   }
 }
