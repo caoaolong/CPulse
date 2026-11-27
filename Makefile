@@ -47,8 +47,9 @@ else ifneq ($(findstring Darwin,$(UNAME_S)),)
 endif
 
 # ---------------------------------------------------------------- sources
-# Top-level (shared) + per-architecture (qwen / t5) + tokenizer strategies (tok).
+# Top-level (shared) + API routes + per-architecture (qwen / t5) + tok.
 SRCS := $(wildcard $(SRC)/*.c) \
+        $(wildcard $(SRC)/api/*.c) \
         $(wildcard $(SRC)/qwen/*.c) \
         $(wildcard $(SRC)/t5/*.c) \
         $(wildcard $(SRC)/tok/*.c)

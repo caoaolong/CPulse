@@ -1,8 +1,8 @@
 /*
- * server.h - OpenAI-compatible HTTP API (Mongoose)
+ * server.h - OpenAI-compatible HTTP listener (Mongoose)
  *
- * Current surface: GET /v1/models
- * Blocking event loop; returns only on listen failure.
+ * Route handlers live in src/api/ (one file per endpoint family).
+ * Serve mode does not preload weights; catalog comes from models_dir.
  */
 
 #ifndef SERVER_H
@@ -16,10 +16,14 @@ extern "C" {
 #define CP_DEFAULT_SERVER_PORT 8080
 #endif
 
+#ifndef CP_DEFAULT_MODELS_DIR
+#define CP_DEFAULT_MODELS_DIR ".cache"
+#endif
+
 typedef struct {
-    const char *model_dir; /* used to derive OpenAI model id (basename) */
-    const char *host;      /* NULL => "0.0.0.0" */
-    int         port;      /* <=0 => CP_DEFAULT_SERVER_PORT */
+    const char *models_dir; /* scan root; NULL => CP_DEFAULT_MODELS_DIR */
+    const char *host;       /* NULL => "0.0.0.0" */
+    int         port;       /* <=0 => CP_DEFAULT_SERVER_PORT */
 } cp_server_cfg_t;
 
 /*

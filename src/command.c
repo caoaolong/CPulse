@@ -243,12 +243,16 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
 /* ---- commands ----------------------------------------------------- */
 
 void cp_cmd_help(const char *prog) {
-    printf("Usage: %s [--model <model_dir>] [--routes <path>] "
-           "[--input <text>] [--token <token>] [--view [out.svg]] "
-           "[--max-new <n>] [--temp <f>] [--top-k <n>] [--top-p <f>] "
-           "[--seed <u>] [--gpu] [--serve] [--port <n>]\n", prog);
+    printf("Usage: %s [--model <model_dir>] [--models-dir <dir>] "
+           "[--routes <path>] [--input <text>] [--token <token>] "
+           "[--view [out.svg]] [--max-new <n>] [--temp <f>] [--top-k <n>] "
+           "[--top-p <f>] [--seed <u>] [--gpu] [--serve] [--port <n>]\n",
+           prog);
     printf("  --model <model_dir>       path to the model directory\n");
-    printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
+    printf("                            (default for CLI: %s; unused by --serve)\n",
+           CP_DEFAULT_MODEL_DIR);
+    printf("  --models-dir <dir>        --serve: scan root for model folders\n");
+    printf("                            (default: %s)\n", CP_DEFAULT_MODELS_DIR);
     printf("  --routes <path>           unified routes JSON (arch + tokenizer)\n");
     printf("                            (default: %s)\n", CP_DEFAULT_ROUTES);
     printf("  --input <text>            generate a continuation of <text>\n");
@@ -263,8 +267,8 @@ void cp_cmd_help(const char *prog) {
     printf("  --top-p <f>               nucleus sampling (1 = off)\n");
     printf("  --seed <u>                RNG seed when not greedy\n");
     printf("  --gpu                     run the forward pass on CUDA (falls back to cpu)\n");
-    printf("  --serve                   OpenAI-compatible HTTP server "
-           "(GET /v1/models)\n");
+    printf("  --serve                   OpenAI HTTP API; no preload, list from "
+           "--models-dir\n");
     printf("  --port <n>                listen port with --serve (default %d)\n",
            CP_DEFAULT_SERVER_PORT);
 }
@@ -801,16 +805,18 @@ static int cmd_generate(const cp_cli_t *cli) {
 }
 
 int cp_command_run(const cp_cli_t *cli) {
-    if (!cli || !cli->model_dir) return 1;
+    if (!cli) return 1;
 
-    /* HTTP server does not need routes/weights for /v1/models. */
+    /* HTTP: no default model; catalog from models_dir, load on chat later. */
     if (cli->serve) {
         cp_server_cfg_t scfg;
         memset(&scfg, 0, sizeof scfg);
-        scfg.model_dir = cli->model_dir;
+        scfg.models_dir = cli->models_dir;
         scfg.port = cli->port;
         return cp_server_run(&scfg) == 0 ? 0 : 1;
     }
+
+    if (!cli->model_dir) return 1;
 
     /* Unified routes: arch + tokenizer (+ bind recipes on demand). */
     {

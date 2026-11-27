@@ -33,7 +33,7 @@ static int is_console_redir_token(const char *arg) {
 int main(int argc, char **argv) {
     cp_cli_t cli;
     memset(&cli, 0, sizeof cli);
-    cli.model_dir = CP_DEFAULT_MODEL_DIR;
+    /* model_dir default applied after parse: serve mode stays unbound */
     cli.max_new = CP_DEFAULT_MAX_NEW;
     cli.port = CP_DEFAULT_SERVER_PORT;
     cp_sample_cfg_default(&cli.sample);
@@ -43,6 +43,13 @@ int main(int argc, char **argv) {
             continue;
         } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
             cli.model_dir = argv[++i];
+        } else if (strcmp(argv[i], "--models-dir") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --models-dir\n");
+                cp_cmd_help(argv[0]);
+                return 1;
+            }
+            cli.models_dir = argv[++i];
         } else if (strcmp(argv[i], "--routes") == 0 ||
                    strcmp(argv[i], "--arch-config") == 0) {
             /* --arch-config kept as alias for --routes */
@@ -134,6 +141,15 @@ int main(int argc, char **argv) {
         }
     }
 
-    printf("%s v%s | model %s\n", ENGINE_NAME, ENGINE_VERSION, cli.model_dir);
+    if (cli.serve) {
+        const char *root =
+                cli.models_dir ? cli.models_dir : CP_DEFAULT_MODELS_DIR;
+        printf("%s v%s | serve models_dir=%s (lazy load)\n", ENGINE_NAME,
+               ENGINE_VERSION, root);
+    } else {
+        if (!cli.model_dir) cli.model_dir = CP_DEFAULT_MODEL_DIR;
+        printf("%s v%s | model %s\n", ENGINE_NAME, ENGINE_VERSION,
+               cli.model_dir);
+    }
     return cp_command_run(&cli);
 }

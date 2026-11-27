@@ -20,7 +20,8 @@ extern "C" {
 #define CP_DEFAULT_MAX_NEW   64
 
 typedef struct {
-    const char *model_dir;
+    const char *model_dir;   /* CLI load/generate; unused by --serve catalog */
+    const char *models_dir;  /* --serve scan root; NULL => CP_DEFAULT_MODELS_DIR */
     const char *routes_path; /* NULL => CP_DEFAULT_ROUTES (arch+tokenizer) */
     const char *input_text;  /* NULL unless --input */
     const char *token_text;  /* NULL unless --token (takes priority) */
