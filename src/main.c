@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "command.h"
+#include "server.h"
 
 #define ENGINE_NAME    "cpulse"
 #define ENGINE_VERSION "0.3.0"
@@ -34,6 +35,7 @@ int main(int argc, char **argv) {
     memset(&cli, 0, sizeof cli);
     cli.model_dir = CP_DEFAULT_MODEL_DIR;
     cli.max_new = CP_DEFAULT_MAX_NEW;
+    cli.port = CP_DEFAULT_SERVER_PORT;
     cp_sample_cfg_default(&cli.sample);
 
     for (int i = 1; i < argc; i++) {
@@ -103,6 +105,16 @@ int main(int argc, char **argv) {
             cli.sample.seed = (uint64_t)strtoull(argv[++i], NULL, 10);
         } else if (strcmp(argv[i], "--gpu") == 0) {
             cli.use_gpu = 1;
+        } else if (strcmp(argv[i], "--serve") == 0) {
+            cli.serve = 1;
+        } else if (strcmp(argv[i], "--port") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --port\n");
+                cp_cmd_help(argv[0]);
+                return 1;
+            }
+            cli.port = atoi(argv[++i]);
+            if (cli.port <= 0) cli.port = CP_DEFAULT_SERVER_PORT;
         } else if (strcmp(argv[i], "--view") == 0) {
             /* optional path: --view out.svg  or bare --view.
              * Do NOT treat cppdbg's injected "2>CON" / "1>CON" as a path. */

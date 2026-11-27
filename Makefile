@@ -26,6 +26,7 @@ BUILD   := build
 INC     := include
 SRC     := src
 CJSON   := third_party/cJSON
+MONGOOSE := third_party/mongoose
 TARGET_NAME := cpulse.exe
 
 # ---------------------------------------------------------------- platform
@@ -52,12 +53,16 @@ SRCS := $(wildcard $(SRC)/*.c) \
         $(wildcard $(SRC)/t5/*.c) \
         $(wildcard $(SRC)/tok/*.c)
 OBJS := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
-OBJS += $(BUILD)/cJSON.o
+OBJS += $(BUILD)/cJSON.o $(BUILD)/mongoose.o
 DEPS := $(OBJS:.o=.d)
 
 # ---------------------------------------------------------------- flags
-CFLAGS_RELEASE := -O2 -std=c11 -Wall -Wextra -I$(INC) -I$(CJSON)
-CFLAGS_DEBUG   := -O0 -g3 -std=c11 -Wall -Wextra -I$(INC) -I$(CJSON)
+CFLAGS_RELEASE := -O2 -std=c11 -Wall -Wextra -I$(INC) -I$(CJSON) -I$(MONGOOSE)
+CFLAGS_DEBUG   := -O0 -g3 -std=c11 -Wall -Wextra -I$(INC) -I$(CJSON) -I$(MONGOOSE)
+# mongoose is third-party; keep warnings local to our sources
+# Cygwin: no epoll; alloca() needs an explicit include
+MONGOOSE_CFLAGS := -O2 -std=gnu11 -I$(MONGOOSE) \
+	-DMG_TLS=MG_TLS_NONE -DMG_ENABLE_EPOLL=0 -include alloca.h
 LDLIBS         := -lm
 
 # default (no target given): release
@@ -105,6 +110,9 @@ $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
 
 $(BUILD)/cJSON.o: $(CJSON)/cJSON.c | $(BUILD)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+$(BUILD)/mongoose.o: $(MONGOOSE)/mongoose.c | $(BUILD)
+	$(CC) $(MONGOOSE_CFLAGS) -MMD -MP -c $< -o $@
 
 # link
 $(BUILD)/$(TARGET_NAME): $(OBJS)

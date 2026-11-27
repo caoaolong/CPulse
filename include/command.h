@@ -27,6 +27,8 @@ typedef struct {
     const char *view_path;   /* non-NULL => --view ("" = default path) */
     int         max_new;
     int         use_gpu;
+    int         serve;       /* 1 => OpenAI-compatible HTTP server */
+    int         port;        /* HTTP listen port when serve != 0 */
     cp_sample_cfg_t sample;  /* temperature / top-k / top-p / seed */
 } cp_cli_t;
 

@@ -12,6 +12,7 @@
 #include "qwen/weights.h"
 #include "view.h"
 #include "safetensors.h"
+#include "server.h"
 #include "t5/config.h"
 #include "t5/encoder.h"
 #include "t5/generate.h"
@@ -245,7 +246,7 @@ void cp_cmd_help(const char *prog) {
     printf("Usage: %s [--model <model_dir>] [--routes <path>] "
            "[--input <text>] [--token <token>] [--view [out.svg]] "
            "[--max-new <n>] [--temp <f>] [--top-k <n>] [--top-p <f>] "
-           "[--seed <u>] [--gpu]\n", prog);
+           "[--seed <u>] [--gpu] [--serve] [--port <n>]\n", prog);
     printf("  --model <model_dir>       path to the model directory\n");
     printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
     printf("  --routes <path>           unified routes JSON (arch + tokenizer)\n");
@@ -262,6 +263,10 @@ void cp_cmd_help(const char *prog) {
     printf("  --top-p <f>               nucleus sampling (1 = off)\n");
     printf("  --seed <u>                RNG seed when not greedy\n");
     printf("  --gpu                     run the forward pass on CUDA (falls back to cpu)\n");
+    printf("  --serve                   OpenAI-compatible HTTP server "
+           "(GET /v1/models)\n");
+    printf("  --port <n>                listen port with --serve (default %d)\n",
+           CP_DEFAULT_SERVER_PORT);
 }
 
 /* Basename of model_dir -> "<name>.svg" into out (cap bytes). */
@@ -797,6 +802,15 @@ static int cmd_generate(const cp_cli_t *cli) {
 
 int cp_command_run(const cp_cli_t *cli) {
     if (!cli || !cli->model_dir) return 1;
+
+    /* HTTP server does not need routes/weights for /v1/models. */
+    if (cli->serve) {
+        cp_server_cfg_t scfg;
+        memset(&scfg, 0, sizeof scfg);
+        scfg.model_dir = cli->model_dir;
+        scfg.port = cli->port;
+        return cp_server_run(&scfg) == 0 ? 0 : 1;
+    }
 
     /* Unified routes: arch + tokenizer (+ bind recipes on demand). */
     {
