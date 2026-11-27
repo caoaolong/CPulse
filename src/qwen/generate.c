@@ -5,8 +5,8 @@
  * takes argmax of the latest logits until a stop id or max_new.
  */
 
-#include "generate.h"
-#include "forward.h"
+#include "qwen/generate.h"
+#include "qwen/forward.h"
 
 #include <stdio.h>
 #include <stdlib.h>

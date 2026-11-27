@@ -1,5 +1,5 @@
 /*
- * tokenizer.c - Qwen2 byte-level BPE tokenizer (see tokenizer.h)
+ * bpe.c - byte-level BPE tokenizer backend (see tok/bpe.h)
  *
  * Pipeline per input: split special tokens -> pre-tokenize with the
  * Split regex from tokenizer.json (hand-scanned, no regex engine) ->
@@ -7,7 +7,7 @@
  * vocab lookup. Ranks come from merges.txt line order.
  */
 
-#include "tokenizer.h"
+#include "tok/bpe.h"
 #include "cJSON.h"
 
 #include <stdint.h>
@@ -121,7 +121,7 @@ typedef struct {
     uint32_t id;
 } t_spec_t;
 
-struct cp_tok {
+struct tok_bpe {
     t_map_t   vocab;    /* token bytes -> id */
     t_map_t   merges;   /* "left\x01right" -> rank */
     char    **str;      /* id -> token bytes (aliases map/spec storage) */
@@ -163,7 +163,7 @@ static int read_file(const char *path, char **out, size_t *out_n) {
 
 /* ---------------- byte mapping (GPT-2 bytes_to_unicode) ---------------- */
 
-static void b2u_init(cp_tok_t *t) {
+static void b2u_init(tok_bpe_t *t) {
     int in_set[256] = {0};
     for (int b = 33; b < 127; b++) in_set[b] = 1;   /* '!'..'~' */
     for (int b = 161; b < 173; b++) in_set[b] = 1;
@@ -178,7 +178,7 @@ static void b2u_init(cp_tok_t *t) {
 
 /* ---------------- vocab.json ---------------- */
 
-static int load_vocab(cp_tok_t *t, const char *path) {
+static int load_vocab(tok_bpe_t *t, const char *path) {
     char *buf = NULL;
     size_t n = 0;
     if (read_file(path, &buf, &n) != 0) return -1;
@@ -219,7 +219,7 @@ static int load_vocab(cp_tok_t *t, const char *path) {
 
 /* ---------------- merges.txt ---------------- */
 
-static int load_merges(cp_tok_t *t, const char *path) {
+static int load_merges(tok_bpe_t *t, const char *path) {
     char *buf = NULL;
     size_t n = 0;
     if (read_file(path, &buf, &n) != 0) return -1;
@@ -265,7 +265,7 @@ static int load_merges(cp_tok_t *t, const char *path) {
 
 /* ---------------- specials (tokenizer_config.json) ---------------- */
 
-static int add_spec(cp_tok_t *t, const char *s, size_t len, uint32_t id) {
+static int add_spec(tok_bpe_t *t, const char *s, size_t len, uint32_t id) {
     t_spec_t *ns = realloc(t->spec, (t->n_spec + 1) * sizeof *ns);
     if (!ns) return -1;
     t->spec = ns;
@@ -282,7 +282,7 @@ static int add_spec(cp_tok_t *t, const char *s, size_t len, uint32_t id) {
 }
 
 /* core chat tokens, used when tokenizer_config.json is unavailable */
-static int add_core_specials(cp_tok_t *t) {
+static int add_core_specials(tok_bpe_t *t) {
     static const struct { const char *s; uint32_t id; } core[] = {
         { "<|endoftext|>", 151643 },
         { "<|im_start|>", 151644 },
@@ -295,7 +295,7 @@ static int add_core_specials(cp_tok_t *t) {
     return 0;
 }
 
-static int load_specials(cp_tok_t *t, const char *path) {
+static int load_specials(tok_bpe_t *t, const char *path) {
     char *buf = NULL;
     size_t n = 0;
     if (read_file(path, &buf, &n) != 0) return -1;
@@ -337,9 +337,9 @@ static int load_specials(cp_tok_t *t, const char *path) {
 
 /* ---------------- public load/free ---------------- */
 
-int cp_tok_load(cp_tok_t **out, const char *model_dir) {
+int tok_bpe_load(tok_bpe_t **out, const char *model_dir) {
     char path[1024];
-    cp_tok_t *t = calloc(1, sizeof *t);
+    tok_bpe_t *t = calloc(1, sizeof *t);
     if (!t) return -1;
     b2u_init(t);
 
@@ -391,12 +391,12 @@ int cp_tok_load(cp_tok_t **out, const char *model_dir) {
     return 0;
 
 fail:
-    cp_tok_free(t);
+    tok_bpe_free(t);
     if (out) *out = NULL;
     return -1;
 }
 
-void cp_tok_free(cp_tok_t *t) {
+void tok_bpe_free(tok_bpe_t *t) {
     if (!t) return;
     t_map_free(&t->vocab);
     t_map_free(&t->merges);
@@ -578,7 +578,7 @@ typedef struct {
     uint32_t len;
 } sym_t;
 
-static int pair_rank(const cp_tok_t *t, const char *a, size_t la,
+static int pair_rank(const tok_bpe_t *t, const char *a, size_t la,
                      const char *b, size_t lb, uint32_t *out) {
     size_t kl = la + 1 + lb;
     char *kb = malloc(kl + 1);
@@ -598,7 +598,7 @@ static void sym_free(sym_t *s, size_t n) {
 }
 
 /* encode one pre-token span; appends ids, *pn updated */
-static int bpe_encode(const cp_tok_t *t, const char *s, size_t n,
+static int bpe_encode(const tok_bpe_t *t, const char *s, size_t n,
                       uint32_t *out, size_t *pn, size_t cap) {
     if (n == 0) return 0;
     sym_t *sym = malloc((n + 1) * sizeof *sym);
@@ -688,7 +688,7 @@ static int bpe_encode(const cp_tok_t *t, const char *s, size_t n,
 
 /* ---------------- public encode/decode ---------------- */
 
-int cp_tok_lookup(const cp_tok_t *t, const char *text, uint32_t *out) {
+int tok_bpe_lookup(const tok_bpe_t *t, const char *text, uint32_t *out) {
     if (!t || !text || !out) return -1;
     size_t len = strlen(text);
     if (t_map_get(&t->vocab, text, len, out) == 0) return 0;
@@ -701,7 +701,7 @@ int cp_tok_lookup(const cp_tok_t *t, const char *text, uint32_t *out) {
     return -1;
 }
 
-int cp_tok_encode(const cp_tok_t *t, const char *text,
+int tok_bpe_encode(const tok_bpe_t *t, const char *text,
                   uint32_t *out, size_t cap) {
     if (!t || !text || (!out && cap > 0)) return -1;
     size_t n = strlen(text), p = 0, count = 0;
@@ -750,7 +750,7 @@ static int u8_enc(uint32_t cp, char *o) {
     return 4;
 }
 
-int cp_tok_decode(const cp_tok_t *t, const uint32_t *ids, size_t n,
+int tok_bpe_decode(const tok_bpe_t *t, const uint32_t *ids, size_t n,
                   char *out, size_t cap) {
     if (!t || (!ids && n > 0) || !out || cap == 0) return -1;
     size_t pos = 0;
@@ -782,3 +782,8 @@ int cp_tok_decode(const cp_tok_t *t, const uint32_t *ids, size_t n,
     out[pos] = '\0';
     return (int)pos;
 }
+
+size_t tok_bpe_vocab_size(const tok_bpe_t *t) {
+    return t ? t->n_ids : 0;
+}
+

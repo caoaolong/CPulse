@@ -20,10 +20,10 @@
  * caller: prefill i-th prompt token with pos=i, decode continues.
  */
 
-#include "forward.h"
+#include "qwen/forward.h"
 #include "arch.h"
-#include "ops.h"
-#include "gpu.h"
+#include "qwen/ops.h"
+#include "qwen/gpu.h"
 
 #include <stdio.h>
 #include <stdlib.h>

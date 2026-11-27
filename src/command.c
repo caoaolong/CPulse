@@ -7,14 +7,14 @@
 
 #include "command.h"
 #include "arch.h"
-#include "generate.h"
-#include "model.h"
+#include "qwen/generate.h"
+#include "qwen/model.h"
+#include "qwen/weights.h"
 #include "view.h"
 #include "safetensors.h"
-#include "t5_config.h"
-#include "t5_tokenizer.h"
-#include "tokenizer.h"
-#include "weights.h"
+#include "t5/config.h"
+#include "t5/weights.h"
+#include "tok/tokenizer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,10 +61,10 @@ static int check_model_files(const char *model_dir) {
 }
 
 static void on_gen_token(uint32_t id, size_t pos, void *userdata) {
-    cp_tok_t *tok = (cp_tok_t *)userdata;
+    cp_tokenizer_t *tok = (cp_tokenizer_t *)userdata;
     char piece[64];
     (void)pos;
-    if (cp_tok_decode(tok, &id, 1, piece, sizeof piece) >= 0) {
+    if (cp_tokenizer_decode(tok, &id, 1, piece, sizeof piece, 0) >= 0) {
         printf("%s", piece);
         fflush(stdout);
     }
@@ -72,14 +72,20 @@ static void on_gen_token(uint32_t id, size_t pos, void *userdata) {
 
 /* Loaded model bundle shared by summary / generate. */
 typedef struct {
-    cp_config_t  cfg;
-    st_file_t   *st;
-    cp_weights_t w;
+    int              is_t5;
+    cp_config_t      cfg;     /* Qwen / decoder-only */
+    cp_t5_config_t   t5_cfg;  /* T5 / encoder-decoder */
+    st_file_t       *st;
+    cp_weights_t     w;       /* Qwen */
+    cp_t5_weights_t  t5_w;    /* T5 */
 } model_bundle_t;
 
 static void model_bundle_free(model_bundle_t *m) {
     if (!m) return;
-    cp_weights_free(&m->w);
+    if (m->is_t5)
+        cp_t5_weights_free(&m->t5_w);
+    else
+        cp_weights_free(&m->w);
     st_free(m->st);
     m->st = NULL;
 }
@@ -104,43 +110,45 @@ static void print_st_summary(const st_file_t *st) {
 }
 
 /*
- * Encoder-decoder / T5 path: parse dedicated config, open safetensors for
- * visibility, then stop before Qwen weight binding.
+ * Encoder-decoder / T5 path: dedicated config + tokenizer smoke + weight bind.
  */
 static int load_model_t5(model_bundle_t *m, const char *model_dir,
                          const char *config_path, const cp_cli_t *cli) {
-    cp_t5_config_t t5;
-    if (cp_t5_config_load(config_path, &t5) != 0) {
+    (void)cli;
+    m->is_t5 = 1;
+    if (cp_t5_config_load(config_path, &m->t5_cfg) != 0) {
         printf("Result: FAIL - T5 config loading failed (see stderr).\n");
         return 3;
     }
     printf("arch: %s (%s) vocab=%u d_model=%u d_ff=%u layers=%u/%u heads=%u\n",
-           t5.model_type, cp_arch_name(t5.arch), t5.vocab_size, t5.d_model,
-           t5.d_ff, t5.num_layers, t5.num_decoder_layers, t5.num_heads);
-    cp_t5_config_print(&t5);
+           m->t5_cfg.model_type, cp_arch_name(m->t5_cfg.arch),
+           m->t5_cfg.vocab_size, m->t5_cfg.d_model, m->t5_cfg.d_ff,
+           m->t5_cfg.num_layers, m->t5_cfg.num_decoder_layers,
+           m->t5_cfg.num_heads);
+    cp_t5_config_print(&m->t5_cfg);
 
-    (void)cli;
-    cp_t5_tok_t *tok = NULL;
-    if (cp_t5_tok_load(&tok, model_dir) != 0) {
-        printf("Result: FAIL - T5 tokenizer loading failed (see stderr).\n");
+    cp_tokenizer_t *tok = NULL;
+    if (cp_tokenizer_load(&tok, model_dir) != 0) {
+        printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
         return 6;
     }
     {
         static const char *sample = "translate English to German: Hello";
         uint32_t ids[64];
-        int n = cp_t5_tok_encode(tok, sample, ids, 64, 1);
-        printf("t5_tok: vocab=%zu sample \"%s\" ->",
-               cp_t5_tok_vocab_size(tok), sample);
+        int n = cp_tokenizer_encode(tok, sample, ids, 64, 1);
+        printf("tok[%s]: vocab=%zu sample \"%s\" ->",
+               cp_tok_strategy_name(cp_tokenizer_strategy(tok)),
+               cp_tokenizer_vocab_size(tok), sample);
         if (n < 0) {
             printf(" <encode failed>\n");
-            cp_t5_tok_free(tok);
-            printf("Result: FAIL - T5 tokenization failed (see stderr).\n");
+            cp_tokenizer_free(tok);
+            printf("Result: FAIL - tokenization failed (see stderr).\n");
             return 6;
         }
         for (int i = 0; i < n; i++) printf(" %u", ids[i]);
         printf("\n");
     }
-    cp_t5_tok_free(tok);
+    cp_tokenizer_free(tok);
 
     char weights_path[512];
     snprintf(weights_path, sizeof(weights_path), "%s/model.safetensors",
@@ -152,13 +160,17 @@ static int load_model_t5(model_bundle_t *m, const char *model_dir,
     }
     print_st_summary(m->st);
 
-    fprintf(stderr,
-            "cp_t5: weight binding not implemented yet "
-            "(T5 config + tokenizer OK; next step is bind)\n");
-    printf("Result: FAIL - T5 weight binding not implemented yet.\n");
-    st_free(m->st);
-    m->st = NULL;
-    return 5;
+    if (cp_t5_weights_bind(&m->t5_cfg, m->st, &m->t5_w) != 0) {
+        printf("Result: FAIL - T5 weight binding failed (see stderr).\n");
+        st_free(m->st);
+        m->st = NULL;
+        return 5;
+    }
+    cp_t5_weights_print(&m->t5_w);
+    printf("bind: %zu/%zu tensors OK (T5, dtype=%s)\n",
+           m->t5_w.n_bound, m->t5_w.n_expected,
+           st_dtype_name(m->t5_w.dtype));
+    return 0;
 }
 
 static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
@@ -321,37 +333,37 @@ static int cmd_view(const cp_cli_t *cli) {
     return 0;
 }
 
-static int is_t5_model_dir(const char *model_dir) {
-    char path[512];
-    char mt[32];
-    snprintf(path, sizeof path, "%s/config.json", model_dir);
-    if (cp_config_peek_model_type(path, mt, sizeof mt) != 0) return 0;
-    return strcmp(mt, "t5") == 0 || strcmp(mt, "mt5") == 0 ||
-           strcmp(mt, "flan-t5") == 0;
-}
-
-static int cmd_token_t5(const cp_cli_t *cli) {
-    cp_t5_tok_t *tok = NULL;
-    if (cp_t5_tok_load(&tok, cli->model_dir) != 0) {
-        printf("Result: FAIL - T5 tokenizer loading failed (see stderr).\n");
+static int cmd_token(const cp_cli_t *cli) {
+    cp_tokenizer_t *tok = NULL;
+    if (cp_tokenizer_load(&tok, cli->model_dir) != 0) {
+        printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
         return 6;
     }
-    printf("t5_tok: vocab=%zu pad=%u eos=%u unk=%u\n",
-           cp_t5_tok_vocab_size(tok), cp_t5_tok_pad_id(tok),
-           cp_t5_tok_eos_id(tok), cp_t5_tok_unk_id(tok));
+    printf("tok[%s]: vocab=%zu pad=%u eos=%u unk=%u\n",
+           cp_tok_strategy_name(cp_tokenizer_strategy(tok)),
+           cp_tokenizer_vocab_size(tok), cp_tokenizer_pad_id(tok),
+           cp_tokenizer_eos_id(tok), cp_tokenizer_unk_id(tok));
+
+    uint32_t id = 0;
+    if (cp_tokenizer_lookup(tok, cli->token_text, &id) == 0) {
+        printf("token \"%s\" -> id %u\n", cli->token_text, id);
+        cp_tokenizer_free(tok);
+        return 0;
+    }
 
     size_t cap = strlen(cli->token_text) * 4 + 16;
     uint32_t *ids = malloc(cap * sizeof *ids);
     if (!ids) {
         printf("Result: FAIL - out of memory.\n");
-        cp_t5_tok_free(tok);
+        cp_tokenizer_free(tok);
         return 6;
     }
-    int n = cp_t5_tok_encode(tok, cli->token_text, ids, cap, 1);
+    int add_eos = (cp_tokenizer_strategy(tok) == CP_TOK_UNIGRAM) ? 1 : 0;
+    int n = cp_tokenizer_encode(tok, cli->token_text, ids, cap, add_eos);
     if (n < 0) {
-        printf("Result: FAIL - T5 tokenization failed (see stderr).\n");
+        printf("Result: FAIL - tokenization failed (see stderr).\n");
         free(ids);
-        cp_t5_tok_free(tok);
+        cp_tokenizer_free(tok);
         return 6;
     }
     printf("encode \"%s\" ->", cli->token_text);
@@ -359,49 +371,12 @@ static int cmd_token_t5(const cp_cli_t *cli) {
     printf("\n");
 
     char dec[1024];
-    if (cp_t5_tok_decode(tok, ids, (size_t)n, dec, sizeof dec, 1) >= 0)
-        printf("decode(skip_special): \"%s\"\n", dec);
+    if (cp_tokenizer_decode(tok, ids, (size_t)n, dec, sizeof dec, 1) >= 0)
+        printf("decode: \"%s\"\n", dec);
 
     free(ids);
-    cp_t5_tok_free(tok);
+    cp_tokenizer_free(tok);
     return 0;
-}
-
-static int cmd_token(const cp_cli_t *cli) {
-    if (is_t5_model_dir(cli->model_dir))
-        return cmd_token_t5(cli);
-
-    cp_tok_t *tok = NULL;
-    if (cp_tok_load(&tok, cli->model_dir) != 0) {
-        printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
-        return 6;
-    }
-    uint32_t id = 0;
-    int rc = 0;
-    if (cp_tok_lookup(tok, cli->token_text, &id) == 0) {
-        printf("token \"%s\" -> id %u\n", cli->token_text, id);
-    } else {
-        size_t cap = strlen(cli->token_text) * 4 + 16;
-        uint32_t *ids = malloc(cap * sizeof *ids);
-        if (!ids) {
-            printf("Result: FAIL - out of memory.\n");
-            cp_tok_free(tok);
-            return 6;
-        }
-        int n = cp_tok_encode(tok, cli->token_text, ids, cap);
-        if (n < 0) {
-            printf("Result: FAIL - tokenization failed (see stderr).\n");
-            free(ids);
-            cp_tok_free(tok);
-            return 6;
-        }
-        printf("token \"%s\" not in vocab as-is; as text ->", cli->token_text);
-        for (int i = 0; i < n; i++) printf(" %u", ids[i]);
-        printf("\n");
-        free(ids);
-    }
-    cp_tok_free(tok);
-    return rc;
 }
 
 static int cmd_summary(const cp_cli_t *cli) {
@@ -418,10 +393,17 @@ static int cmd_generate(const cp_cli_t *cli) {
     int rc = load_model(&m, cli);
     if (rc != 0) return rc;
 
+    if (m.is_t5) {
+        printf("Result: FAIL - T5 generate not implemented yet "
+               "(weight bind OK; next: ops / encoder / decoder).\n");
+        model_bundle_free(&m);
+        return 7;
+    }
+
     printf("input: %s\n", cli->input_text);
 
-    cp_tok_t *tok = NULL;
-    if (cp_tok_load(&tok, cli->model_dir) != 0) {
+    cp_tokenizer_t *tok = NULL;
+    if (cp_tokenizer_load(&tok, cli->model_dir) != 0) {
         printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
         model_bundle_free(&m);
         return 6;
@@ -431,15 +413,15 @@ static int cmd_generate(const cp_cli_t *cli) {
     uint32_t *ids = malloc(cap * sizeof *ids);
     if (!ids) {
         printf("Result: FAIL - out of memory.\n");
-        cp_tok_free(tok);
+        cp_tokenizer_free(tok);
         model_bundle_free(&m);
         return 6;
     }
-    int n = cp_tok_encode(tok, cli->input_text, ids, cap);
+    int n = cp_tokenizer_encode(tok, cli->input_text, ids, cap, 0);
     if (n < 0) {
         printf("Result: FAIL - tokenization failed (see stderr).\n");
         free(ids);
-        cp_tok_free(tok);
+        cp_tokenizer_free(tok);
         model_bundle_free(&m);
         return 6;
     }
@@ -452,14 +434,14 @@ static int cmd_generate(const cp_cli_t *cli) {
         if (!piece) {
             printf("Result: FAIL - out of memory.\n");
             free(ids);
-            cp_tok_free(tok);
+            cp_tokenizer_free(tok);
             model_bundle_free(&m);
             return 6;
         }
+        size_t piece_cap = strlen(cli->input_text) * 3 + 16;
         printf("pieces (%d):", n);
         for (int i = 0; i < n; i++) {
-            if (cp_tok_decode(tok, &ids[i], 1, piece,
-                              strlen(cli->input_text) * 3 + 16) < 0) {
+            if (cp_tokenizer_decode(tok, &ids[i], 1, piece, piece_cap, 0) < 0) {
                 printf(" [%u]<?>", ids[i]);
                 continue;
             }
@@ -482,7 +464,7 @@ static int cmd_generate(const cp_cli_t *cli) {
         if (cp_session_init(&sess, &m.cfg, &m.w, cli->use_gpu) != 0) {
             printf("Result: FAIL - session init failed (see stderr).\n");
             free(ids);
-            cp_tok_free(tok);
+            cp_tokenizer_free(tok);
             model_bundle_free(&m);
             return 7;
         }
@@ -499,7 +481,7 @@ static int cmd_generate(const cp_cli_t *cli) {
             printf("Result: FAIL - generate failed (see stderr).\n");
             cp_session_free(sess);
             free(ids);
-            cp_tok_free(tok);
+            cp_tokenizer_free(tok);
             model_bundle_free(&m);
             return 7;
         }
@@ -507,7 +489,7 @@ static int cmd_generate(const cp_cli_t *cli) {
     }
 
     free(ids);
-    cp_tok_free(tok);
+    cp_tokenizer_free(tok);
     model_bundle_free(&m);
     printf("OK\n");
     return 0;

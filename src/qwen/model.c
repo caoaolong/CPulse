@@ -6,7 +6,7 @@
  * or null (standard RoPE); anything else fails loudly.
  */
 
-#include "model.h"
+#include "qwen/model.h"
 #include "arch.h"
 #include "cJSON.h"
 

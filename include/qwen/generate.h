@@ -14,8 +14,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "model.h"
-#include "weights.h"
+#include "qwen/model.h"
+#include "qwen/weights.h"
 
 #ifdef __cplusplus
 extern "C" {

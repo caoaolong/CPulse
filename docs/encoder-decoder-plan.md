@@ -55,14 +55,13 @@ translate English to German: How are you?
 不要把 T5 逻辑塞进现有 `forward.c` / `weights.c`。建议：
 
 ```text
-src/t5/
-  t5_config.c      # 解析 T5 config 字段
-  t5_weights.c     # 按名字表绑定权重
-  t5_tok.c         # SPM / tokenizer.json
-  t5_ops.c         # LayerNorm、相对偏置、attn、FFN
-  t5_encoder.c     # 整段 encode → memory
-  t5_decoder.c     # 单步 decode + KV / cross cache
-  t5_generate.c    # encode → 循环 decode
+src/                  # 共享：main / command / arch / safetensors / view
+src/qwen/             # decoder-only（网络：config/weights/forward/...）
+src/t5/               # encoder-decoder 网络
+src/tok/              # 分词策略（与网络架构解耦）
+  tokenizer.c         # 门面 + tok_routes.json 路由
+  bpe.c / unigram.c   # 算法后端
+include/tok|qwen|t5/
 ```
 
 `command.c`：按策略分发——decoder-only 走现有 `cp_generate`；encoder-decoder 走 `t5_generate`。

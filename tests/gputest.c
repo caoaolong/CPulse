@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "gpu.h"
-#include "ops.h"
+#include "qwen/gpu.h"
+#include "qwen/ops.h"
 
 #define ROWS 2048
 #define COLS 2048

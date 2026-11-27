@@ -1,0 +1,19 @@
+{
+  "bpe": [
+    "BPE",
+    "Qwen2Tokenizer",
+    "GPT2Tokenizer",
+    "RobertaTokenizer",
+    "BartTokenizer",
+    "ByteLevelBPETokenizer"
+  ],
+  "unigram": [
+    "Unigram",
+    "T5Tokenizer",
+    "T5TokenizerFast",
+    "MT5Tokenizer",
+    "AlbertTokenizer",
+    "XLNetTokenizer",
+    "ReformerTokenizer"
+  ]
+}

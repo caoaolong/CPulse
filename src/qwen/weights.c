@@ -6,7 +6,7 @@
  * stages must be able to trust these pointers blindly.
  */
 
-#include "weights.h"
+#include "qwen/weights.h"
 #include "arch.h"
 
 #include <stdio.h>

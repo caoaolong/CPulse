@@ -5,8 +5,8 @@
 #ifndef VIEW_H
 #define VIEW_H
 
-#include "model.h"
-#include "t5_config.h"
+#include "qwen/model.h"
+#include "t5/config.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -7,7 +7,7 @@
  * widening, so kernel sources need no CUDA headers either.
  */
 
-#include "gpu.h"
+#include "qwen/gpu.h"
 
 #include <dlfcn.h>
 #include <dirent.h>

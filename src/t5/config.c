@@ -2,7 +2,7 @@
  * t5_config.c - T5 config.json loader (see t5_config.h)
  */
 
-#include "t5_config.h"
+#include "t5/config.h"
 #include "cJSON.h"
 
 #include <stdio.h>

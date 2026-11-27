@@ -1,5 +1,5 @@
 /*
- * t5_tokenizer.c - T5 Unigram tokenizer (see t5_tokenizer.h)
+ * unigram.c - Unigram tokenizer backend (see tok/unigram.h)
  *
  * Loads model.vocab from tokenizer.json, then:
  *   1) space -> U+2581 (▁); optional dummy prefix ▁
@@ -7,7 +7,7 @@
  *   3) optional eos append
  */
 
-#include "t5_tokenizer.h"
+#include "tok/unigram.h"
 #include "cJSON.h"
 
 #include <float.h>
@@ -124,7 +124,7 @@ static void u_map_free(u_map_t *m) {
 
 /* ---------------- tokenizer state ---------------- */
 
-struct cp_t5_tok {
+struct tok_unigram {
     u_map_t   piece_to_id; /* piece bytes -> id+score */
     char    **id_to_piece; /* owned strings; may be NULL slots */
     size_t    n_ids;
@@ -179,7 +179,7 @@ static size_t utf8_char_len(const unsigned char *s, size_t n) {
     return need;
 }
 
-static int ensure_id_slot(cp_t5_tok_t *t, uint32_t id) {
+static int ensure_id_slot(tok_unigram_t *t, uint32_t id) {
     if (id < t->n_ids) return 0;
     size_t nn = (size_t)id + 1;
     char **np = realloc(t->id_to_piece, nn * sizeof *np);
@@ -190,7 +190,7 @@ static int ensure_id_slot(cp_t5_tok_t *t, uint32_t id) {
     return 0;
 }
 
-static int add_piece(cp_t5_tok_t *t, const char *piece, size_t plen,
+static int add_piece(tok_unigram_t *t, const char *piece, size_t plen,
                      uint32_t id, float score) {
     if (plen == 0) return 0;
     if (u_map_put(&t->piece_to_id, piece, plen, id, score) != 0) return -1;
@@ -209,7 +209,7 @@ static int add_piece(cp_t5_tok_t *t, const char *piece, size_t plen,
 
 /* ---------------- JSON backend ---------------- */
 
-static int load_from_json(cp_t5_tok_t *t, const char *path) {
+static int load_from_json(tok_unigram_t *t, const char *path) {
     char *buf = NULL;
     size_t n = 0;
     if (read_file(path, &buf, &n) != 0) return -1;
@@ -335,7 +335,7 @@ static int spm_surface(const char *text, int add_dummy_prefix,
     return 0;
 }
 
-static int unigram_encode(const cp_t5_tok_t *t, const char *s, size_t n,
+static int unigram_encode(const tok_unigram_t *t, const char *s, size_t n,
                           uint32_t *out, size_t cap, size_t *out_n) {
     if (n == 0) {
         *out_n = 0;
@@ -431,7 +431,7 @@ static int unigram_encode(const cp_t5_tok_t *t, const char *s, size_t n,
 
 /* ---------------- public API ---------------- */
 
-void cp_t5_tok_free(cp_t5_tok_t *t) {
+void tok_unigram_free(tok_unigram_t *t) {
     if (!t) return;
     u_map_free(&t->piece_to_id);
     if (t->id_to_piece) {
@@ -441,11 +441,11 @@ void cp_t5_tok_free(cp_t5_tok_t *t) {
     free(t);
 }
 
-int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir) {
+int tok_unigram_load(tok_unigram_t **out, const char *model_dir) {
     if (!out || !model_dir) return -1;
     *out = NULL;
 
-    cp_t5_tok_t *t = calloc(1, sizeof *t);
+    tok_unigram_t *t = calloc(1, sizeof *t);
     if (!t) return -1;
     t->pad_id = 0;
     t->eos_id = 1;
@@ -456,19 +456,19 @@ int cp_t5_tok_load(cp_t5_tok_t **out, const char *model_dir) {
     char path[512];
     snprintf(path, sizeof path, "%s/tokenizer.json", model_dir);
     if (load_from_json(t, path) != 0) {
-        cp_t5_tok_free(t);
+        tok_unigram_free(t);
         return -1;
     }
     *out = t;
     return 0;
 }
 
-uint32_t cp_t5_tok_pad_id(const cp_t5_tok_t *t) { return t ? t->pad_id : 0; }
-uint32_t cp_t5_tok_eos_id(const cp_t5_tok_t *t) { return t ? t->eos_id : 1; }
-uint32_t cp_t5_tok_unk_id(const cp_t5_tok_t *t) { return t ? t->unk_id : 2; }
-size_t   cp_t5_tok_vocab_size(const cp_t5_tok_t *t) { return t ? t->n_ids : 0; }
+uint32_t tok_unigram_pad_id(const tok_unigram_t *t) { return t ? t->pad_id : 0; }
+uint32_t tok_unigram_eos_id(const tok_unigram_t *t) { return t ? t->eos_id : 1; }
+uint32_t tok_unigram_unk_id(const tok_unigram_t *t) { return t ? t->unk_id : 2; }
+size_t   tok_unigram_vocab_size(const tok_unigram_t *t) { return t ? t->n_ids : 0; }
 
-int cp_t5_tok_encode(const cp_t5_tok_t *t, const char *text,
+int tok_unigram_encode(const tok_unigram_t *t, const char *text,
                      uint32_t *out, size_t cap, int add_eos) {
     if (!t || !text || !out) return -1;
 
@@ -491,7 +491,7 @@ int cp_t5_tok_encode(const cp_t5_tok_t *t, const char *text,
     return (int)n;
 }
 
-int cp_t5_tok_decode(const cp_t5_tok_t *t, const uint32_t *ids, size_t n,
+int tok_unigram_decode(const tok_unigram_t *t, const uint32_t *ids, size_t n,
                      char *out, size_t cap, int skip_special) {
     if (!t || !out || cap == 0) return -1;
     if (n > 0 && !ids) return -1;

@@ -2,7 +2,7 @@
  * ops.c - reference math operators, CPU (see ops.h)
  */
 
-#include "ops.h"
+#include "qwen/ops.h"
 
 #include <math.h>
 #include <stdlib.h>

@@ -13,7 +13,7 @@
 #ifndef WEIGHTS_H
 #define WEIGHTS_H
 
-#include "model.h"
+#include "qwen/model.h"
 #include "safetensors.h"
 
 #ifdef __cplusplus

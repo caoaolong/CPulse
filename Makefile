@@ -46,7 +46,11 @@ else ifneq ($(findstring Darwin,$(UNAME_S)),)
 endif
 
 # ---------------------------------------------------------------- sources
-SRCS := $(wildcard $(SRC)/*.c)
+# Top-level (shared) + per-architecture (qwen / t5) + tokenizer strategies (tok).
+SRCS := $(wildcard $(SRC)/*.c) \
+        $(wildcard $(SRC)/qwen/*.c) \
+        $(wildcard $(SRC)/t5/*.c) \
+        $(wildcard $(SRC)/tok/*.c)
 OBJS := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SRCS))
 OBJS += $(BUILD)/cJSON.o
 DEPS := $(OBJS:.o=.d)
@@ -94,7 +98,9 @@ $(BUILD):
 	$(call MKDIR_P,$(BUILD))
 
 # compile: .c -> .o (also emit dependency files for incremental builds)
+# % may contain a subdirectory (e.g. t5/config); ensure output dir exists.
 $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
+	$(call MKDIR_P,$(dir $@))
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 $(BUILD)/cJSON.o: $(CJSON)/cJSON.c | $(BUILD)
