@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "name": "Cygwin",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/third_party/cJSON",
+        "C:/cygwin64/usr/include",
+        "C:/cygwin64/lib/gcc/x86_64-pc-cygwin/14/include",
+        "C:/cygwin64/usr/include/w32api"
+      ],
+      "defines": [
+        "__CYGWIN__",
+        "_GNU_SOURCE"
+      ],
+      "compilerPath": "C:/cygwin64/bin/gcc.exe",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-gcc-x64"
+    }
+  ],
+  "version": 4
+}

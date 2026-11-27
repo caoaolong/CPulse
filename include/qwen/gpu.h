@@ -1,20 +1,8 @@
 /*
- * gpu.h - CUDA driver-API + NVRTC backend for CPulse
+ * gpu.h - Qwen CUDA kernels + decoder forward
  *
- * Runs on the stock Cygwin/GCC toolchain: no MSVC, no nvcc. The driver
- * library (nvcuda.dll, ships with the GPU driver) and the runtime
- * compiler (nvrtc64_*.dll, ships with the CUDA toolkit) are loaded with
- * dlopen at startup; kernels are compiled from embedded source strings
- * for the detected compute capability (RTX 3050 Laptop = sm_86).
- *
- * Current scope is the bring-up path: context init, NVRTC-compiled
- * BF16 matvec, per-call upload/compute/download. Persistent
- * device-resident weights and multi-op fusion come with the forward
- * pass; the kernel summation order already matches cp_matvec so parity
- * is exact up to FP32 rounding.
- *
- * Logging convention: informational bring-up lines go to stdout (stderr
- * is not wired to the console under some debuggers); errors go to stderr.
+ * Shared driver/NVRTC/context live in gpu_runtime.h. This module compiles
+ * Qwen-specific kernels and runs the decoder-only forward on device.
  */
 
 #ifndef GPU_H

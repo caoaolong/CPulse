@@ -120,15 +120,15 @@ include/tok|qwen|t5/
 
 ### 步骤 4 — 基础算子
 
-在 `t5_ops`（或扩展 `ops.c` 但命名隔离）实现：
+在 `src/t5/ops.c`（与 Qwen `ops` 隔离）实现：
 
-1. LayerNorm
-2. 相对位置 bias → attention logits
-3. 双向 Self-Attention / 因果 Self-Attention
-4. Cross-Attention（Q←decoder，K/V←encoder memory）
+1. LayerNorm（HF T5LayerNorm：RMS 风格，无均值、无 bias）
+2. 相对位置 bucket + bias → attention logits（**不**乘 `1/sqrt(d_kv)`）
+3. 双向 / 因果 Self-Attention（`cp_t5_self_attention`）
+4. Cross-Attention（`cp_t5_cross_attention`，无 relative bias）
 5. DenseReluDense：`wo(relu(wi(x)))`
 
-**验收**：单层小矩阵与 NumPy/HF 对照，FP32 下误差约 `1e-4`～`1e-5`。
+**验收**：小矩阵自检（LN / bucket / FFN / MHA）通过；后续 Encoder 步再与 HF hidden 对齐。
 
 ---
 
