@@ -24,6 +24,7 @@ typedef struct {
     const char *models_dir; /* scan root; NULL => CP_DEFAULT_MODELS_DIR */
     const char *host;       /* NULL => "0.0.0.0" */
     int         port;       /* <=0 => CP_DEFAULT_SERVER_PORT */
+    int         use_gpu;    /* pass through to lazy session init */
 } cp_server_cfg_t;
 
 /*

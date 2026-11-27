@@ -807,17 +807,6 @@ static int cmd_generate(const cp_cli_t *cli) {
 int cp_command_run(const cp_cli_t *cli) {
     if (!cli) return 1;
 
-    /* HTTP: no default model; catalog from models_dir, load on chat later. */
-    if (cli->serve) {
-        cp_server_cfg_t scfg;
-        memset(&scfg, 0, sizeof scfg);
-        scfg.models_dir = cli->models_dir;
-        scfg.port = cli->port;
-        return cp_server_run(&scfg) == 0 ? 0 : 1;
-    }
-
-    if (!cli->model_dir) return 1;
-
     /* Unified routes: arch + tokenizer (+ bind recipes on demand). */
     {
         const char *routes = cli->routes_path ? cli->routes_path
@@ -834,6 +823,18 @@ int cp_command_run(const cp_cli_t *cli) {
         }
         cp_bind_set_routes_path(routes);
     }
+
+    /* HTTP: no default model; catalog from models_dir, lazy-load on chat. */
+    if (cli->serve) {
+        cp_server_cfg_t scfg;
+        memset(&scfg, 0, sizeof scfg);
+        scfg.models_dir = cli->models_dir;
+        scfg.port = cli->port;
+        scfg.use_gpu = cli->use_gpu;
+        return cp_server_run(&scfg) == 0 ? 0 : 1;
+    }
+
+    if (!cli->model_dir) return 1;
 
     if (cli->view_path) return cmd_view(cli);
     if (cli->token_text) return cmd_token(cli);

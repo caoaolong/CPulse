@@ -40,12 +40,13 @@ static int catalog_add(cp_api_ctx_t *ctx, const char *id, const char *path) {
     return 0;
 }
 
-void cp_api_ctx_init(cp_api_ctx_t *ctx, const char *models_dir) {
+void cp_api_ctx_init(cp_api_ctx_t *ctx, const char *models_dir, int use_gpu) {
     memset(ctx, 0, sizeof *ctx);
     const char *root =
             (models_dir && models_dir[0]) ? models_dir : CP_DEFAULT_MODELS_DIR;
     snprintf(ctx->models_dir, sizeof ctx->models_dir, "%s", root);
     ctx->created = (long)time(NULL);
+    ctx->use_gpu = use_gpu ? 1 : 0;
     cp_api_catalog_scan(ctx);
 }
 

@@ -20,7 +20,7 @@ int cp_server_run(const cp_server_cfg_t *cfg) {
     if (!cfg) return -1;
 
     cp_api_ctx_t ctx;
-    cp_api_ctx_init(&ctx, cfg->models_dir);
+    cp_api_ctx_init(&ctx, cfg->models_dir, cfg->use_gpu);
 
     const char *host = (cfg->host && cfg->host[0]) ? cfg->host : "0.0.0.0";
     int port = cfg->port > 0 ? cfg->port : CP_DEFAULT_SERVER_PORT;
@@ -42,7 +42,9 @@ int cp_server_run(const cp_server_cfg_t *cfg) {
            ctx.models_dir, ctx.n_models);
     for (size_t i = 0; i < ctx.n_models; i++)
         printf("  - %s\n", ctx.models[i].id);
+    printf("server: use_gpu=%d\n", ctx.use_gpu);
     printf("server: try  GET %s/v1/models\n", url);
+    printf("server: try  POST %s/v1/chat/completions\n", url);
     fflush(stdout);
 
     for (;;)

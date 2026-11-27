@@ -2,6 +2,7 @@
  * api/router.c - dispatch OpenAI-compatible routes to per-endpoint handlers
  */
 
+#include "api/chat_completions.h"
 #include "api/ctx.h"
 #include "api/models.h"
 
@@ -13,7 +14,7 @@ void cp_api_dispatch(struct mg_connection *c, struct mg_http_message *hm,
     }
 
     if (api_models_handle(c, hm, ctx)) return;
-    /* future: api_chat_completions_handle(c, hm, ctx); */
+    if (api_chat_completions_handle(c, hm, ctx)) return;
 
     cp_api_reply_json(
             c, 404,
