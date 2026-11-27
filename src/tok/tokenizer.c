@@ -138,11 +138,17 @@ int cp_tok_routes_load(const char *path) {
         cJSON_Delete(root);
         return -1;
     }
-    if (fill_list_from_array(cJSON_GetObjectItemCaseSensitive(root, "bpe"),
+    /* Prefer sectioned { "tokenizer": { ... } }; fall back to flat root. */
+    cJSON *tok = cJSON_GetObjectItemCaseSensitive(root, "tokenizer");
+    cJSON *sec = cJSON_IsObject(tok) ? tok : root;
+    if (fill_list_from_array(cJSON_GetObjectItemCaseSensitive(sec, "bpe"),
                              &g_bpe) != 0 ||
-        fill_list_from_array(cJSON_GetObjectItemCaseSensitive(root, "unigram"),
+        fill_list_from_array(cJSON_GetObjectItemCaseSensitive(sec, "unigram"),
                              &g_unigram) != 0) {
-        fprintf(stderr, "cp_tok: invalid routes shape in '%s'\n", path);
+        fprintf(stderr,
+                "cp_tok: '%s' must define tokenizer.bpe and "
+                "tokenizer.unigram as string arrays\n",
+                path);
         cJSON_Delete(root);
         routes_clear();
         return -1;

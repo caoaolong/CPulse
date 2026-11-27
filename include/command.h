@@ -19,7 +19,7 @@ extern "C" {
 
 typedef struct {
     const char *model_dir;
-    const char *arch_config; /* NULL => CP_DEFAULT_ARCH_CONFIG */
+    const char *routes_path; /* NULL => CP_DEFAULT_ROUTES (arch+tokenizer) */
     const char *input_text;  /* NULL unless --input */
     const char *token_text;  /* NULL unless --token (takes priority) */
     const char *view_path;   /* non-NULL => --view ("" = default path) */

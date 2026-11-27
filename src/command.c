@@ -110,7 +110,8 @@ static void print_st_summary(const st_file_t *st) {
 }
 
 /*
- * Encoder-decoder / T5 path: dedicated config + tokenizer smoke + weight bind.
+ * Encoder-decoder / T5 path: dedicated config + weight bind.
+ * Tokenizer is loaded later by --token / generate, not here.
  */
 static int load_model_t5(model_bundle_t *m, const char *model_dir,
                          const char *config_path, const cp_cli_t *cli) {
@@ -126,29 +127,6 @@ static int load_model_t5(model_bundle_t *m, const char *model_dir,
            m->t5_cfg.num_layers, m->t5_cfg.num_decoder_layers,
            m->t5_cfg.num_heads);
     cp_t5_config_print(&m->t5_cfg);
-
-    cp_tokenizer_t *tok = NULL;
-    if (cp_tokenizer_load(&tok, model_dir) != 0) {
-        printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
-        return 6;
-    }
-    {
-        static const char *sample = "translate English to German: Hello";
-        uint32_t ids[64];
-        int n = cp_tokenizer_encode(tok, sample, ids, 64, 1);
-        printf("tok[%s]: vocab=%zu sample \"%s\" ->",
-               cp_tok_strategy_name(cp_tokenizer_strategy(tok)),
-               cp_tokenizer_vocab_size(tok), sample);
-        if (n < 0) {
-            printf(" <encode failed>\n");
-            cp_tokenizer_free(tok);
-            printf("Result: FAIL - tokenization failed (see stderr).\n");
-            return 6;
-        }
-        for (int i = 0; i < n; i++) printf(" %u", ids[i]);
-        printf("\n");
-    }
-    cp_tokenizer_free(tok);
 
     char weights_path[512];
     snprintf(weights_path, sizeof(weights_path), "%s/model.safetensors",
@@ -177,17 +155,21 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
     const char *model_dir = cli->model_dir;
     memset(m, 0, sizeof(*m));
 
+    /* 1. 检查模型目录必要文件是否存在（非深度完整性校验） */
     if (check_model_files(model_dir) != 0) return 2;
 
     char config_path[512];
     snprintf(config_path, sizeof(config_path), "%s/config.json", model_dir);
 
+    /* 2. 仅窥读 model_type（完整 config 在分策略后才加载） */
     char model_type[32];
     if (cp_config_peek_model_type(config_path, model_type,
                                   sizeof model_type) != 0) {
         printf("Result: FAIL - config loading failed (see stderr).\n");
         return 3;
     }
+
+    /* 3. 经 routes.json 的 arch 节解析架构策略；未知或未实现则失败 */
     const cp_arch_t *arch = cp_arch_resolve(model_type);
     if (!arch) {
         fprintf(stderr, "cp_config: unknown model_type '%s'\n", model_type);
@@ -204,10 +186,11 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
         return 3;
     }
 
-    /* Strategy open for Enc–Dec, but only the T5-family loader is wired. */
+    /* 4. 按架构分派：Enc–Dec 走 T5 专用加载（config + safetensors + bind） */
     if (arch->id == CP_ARCH_ENCODER_DECODER)
         return load_model_t5(m, model_dir, config_path, cli);
 
+    /* 5. decoder-only：加载完整 Qwen 风格 config */
     if (cp_config_load(config_path, &m->cfg) != 0) {
         printf("Result: FAIL - config loading failed (see stderr).\n");
         return 3;
@@ -217,6 +200,7 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
            m->cfg.hidden_size, m->cfg.intermediate_size, m->cfg.num_hidden_layers,
            m->cfg.num_attention_heads, m->cfg.num_key_value_heads);
 
+    /* 6. 映射并解析 model.safetensors（张量仍在文件缓冲里） */
     char weights_path[512];
     snprintf(weights_path, sizeof(weights_path), "%s/model.safetensors", model_dir);
     m->st = st_load(weights_path);
@@ -226,6 +210,7 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
     }
     print_st_summary(m->st);
 
+    /* 7. 按名字把张量绑到结构体指针（零拷贝） */
     if (cp_weights_bind(&m->cfg, m->st, &m->w) != 0) {
         printf("Result: FAIL - weight binding failed (see stderr).\n");
         st_free(m->st);
@@ -240,13 +225,13 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
 /* ---- commands ----------------------------------------------------- */
 
 void cp_cmd_help(const char *prog) {
-    printf("Usage: %s [--model <model_dir>] [--arch-config <path>] "
+    printf("Usage: %s [--model <model_dir>] [--routes <path>] "
            "[--input <text>] [--token <token>] [--view [out.svg]] "
            "[--max-new <n>] [--gpu]\n", prog);
     printf("  --model <model_dir>       path to the model directory\n");
     printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
-    printf("  --arch-config <path>      model_type -> strategy routes JSON\n");
-    printf("                            (default: %s)\n", CP_DEFAULT_ARCH_CONFIG);
+    printf("  --routes <path>           unified routes JSON (arch + tokenizer)\n");
+    printf("                            (default: %s)\n", CP_DEFAULT_ROUTES);
     printf("  --input <text>            greedy-generate a continuation of <text>\n");
     printf("  --token <token>           print the vocab id of one surface-form token\n");
     printf("  --view [out.svg]          write model-structure SVG "
@@ -498,14 +483,18 @@ static int cmd_generate(const cp_cli_t *cli) {
 int cp_command_run(const cp_cli_t *cli) {
     if (!cli || !cli->model_dir) return 1;
 
-    /* Token lookup does not need architecture routes; load them for
-     * summary / generate so model_type can be classified. */
-    if (!cli->token_text) {
-        const char *routes = cli->arch_config ? cli->arch_config
-                                              : CP_DEFAULT_ARCH_CONFIG;
+    /* Unified routes: arch section + tokenizer section from one file. */
+    {
+        const char *routes = cli->routes_path ? cli->routes_path
+                                              : CP_DEFAULT_ROUTES;
         if (cp_arch_routes_load(routes) != 0) {
-            printf("Result: FAIL - architecture routes loading failed "
-                   "(see stderr).\n");
+            printf("Result: FAIL - routes loading failed (arch section; "
+                   "see stderr).\n");
+            return 1;
+        }
+        if (cp_tok_routes_load(routes) != 0) {
+            printf("Result: FAIL - routes loading failed (tokenizer section; "
+                   "see stderr).\n");
             return 1;
         }
     }

@@ -1,9 +1,10 @@
 /*
  * arch.h - architecture strategy routing for CPulse
  *
- * model_type is mapped to one of three strategies via a JSON route file
- * (default: arch_routes.json). Implementation availability is decided
- * in code: decoder-only (Qwen) and encoder-decoder (T5 config path).
+ * model_type is mapped to one of three strategies via the "arch" section
+ * of the unified routes file (default: config/routes.json).
+ * Implementation availability is decided in code: decoder-only (Qwen)
+ * and encoder-decoder (T5 config path).
  */
 
 #ifndef ARCH_H
@@ -15,7 +16,9 @@
 extern "C" {
 #endif
 
-#define CP_DEFAULT_ARCH_CONFIG "arch_routes.json"
+#define CP_DEFAULT_ROUTES "config/routes.json"
+/* Alias kept for older call sites / docs. */
+#define CP_DEFAULT_ARCH_CONFIG CP_DEFAULT_ROUTES
 
 typedef enum {
     CP_ARCH_UNKNOWN = 0,
@@ -32,11 +35,13 @@ typedef struct cp_arch {
 } cp_arch_t;
 
 /*
- * Load / reload the route table from path.
- * Expected shape:
- *   { "decoder-only": ["qwen2", ...],
- *     "encoder-only": [...],
- *     "encoder-decoder": [...] }
+ * Load / reload the arch route table from path.
+ * Expected shape (sectioned):
+ *   { "arch": {
+ *       "decoder-only": ["qwen2", ...],
+ *       "encoder-only": [...],
+ *       "encoder-decoder": [...]
+ *   }, ... }
  * Returns 0 on success; on failure prints to stderr and returns -1.
  */
 int cp_arch_routes_load(const char *path);

@@ -1,0 +1,41 @@
+{
+  "arch": {
+    "decoder-only": [
+      "qwen2",
+      "llama",
+      "llama2",
+      "llama3",
+      "llama3_2",
+      "tinyllama",
+      "mistral"
+    ],
+    "encoder-only": [
+      "bert",
+      "roberta"
+    ],
+    "encoder-decoder": [
+      "t5",
+      "mt5",
+      "flan-t5"
+    ]
+  },
+  "tokenizer": {
+    "bpe": [
+      "BPE",
+      "Qwen2Tokenizer",
+      "GPT2Tokenizer",
+      "RobertaTokenizer",
+      "BartTokenizer",
+      "ByteLevelBPETokenizer"
+    ],
+    "unigram": [
+      "Unigram",
+      "T5Tokenizer",
+      "T5TokenizerFast",
+      "MT5Tokenizer",
+      "AlbertTokenizer",
+      "XLNetTokenizer",
+      "ReformerTokenizer"
+    ]
+  }
+}

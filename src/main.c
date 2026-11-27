@@ -31,7 +31,7 @@ static int is_console_redir_token(const char *arg) {
 int main(int argc, char **argv) {
     cp_cli_t cli = {
         .model_dir   = CP_DEFAULT_MODEL_DIR,
-        .arch_config = NULL,
+        .routes_path = NULL,
         .input_text  = NULL,
         .token_text  = NULL,
         .view_path   = NULL,
@@ -44,13 +44,15 @@ int main(int argc, char **argv) {
             continue;
         } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
             cli.model_dir = argv[++i];
-        } else if (strcmp(argv[i], "--arch-config") == 0) {
+        } else if (strcmp(argv[i], "--routes") == 0 ||
+                   strcmp(argv[i], "--arch-config") == 0) {
+            /* --arch-config kept as alias for --routes */
             if (i + 1 >= argc) {
-                fprintf(stderr, "missing value for --arch-config\n");
+                fprintf(stderr, "missing value for %s\n", argv[i]);
                 cp_cmd_help(argv[0]);
                 return 1;
             }
-            cli.arch_config = argv[++i];
+            cli.routes_path = argv[++i];
         } else if (strcmp(argv[i], "--input") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "missing value for --input\n");

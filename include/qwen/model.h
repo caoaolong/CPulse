@@ -7,7 +7,7 @@
  * Holds the architecture hyperparameters parsed from the model's
  * config.json, plus the derived values the forward pass needs
  * (strategy id, head_dim, kv repeat factor). Validation maps model_type
- * through arch_routes.json. Decoder-only (Qwen) is validated here;
+ * through config/routes.json (arch section). Decoder-only (Qwen) is validated here;
  * encoder-decoder (T5) uses cp_t5_config_load instead.
  */
 

@@ -2,7 +2,8 @@
  * tok/tokenizer.h - tokenizer strategy facade (BPE / Unigram / ...)
  *
  * Strategy is resolved from the model directory (tokenizer_config class,
- * tokenizer.json model.type, or file layout), optionally via tok_routes.json.
+ * tokenizer.json model.type, or file layout), using the "tokenizer"
+ * section of the unified routes file (default: config/routes.json).
  */
 
 #ifndef TOK_TOKENIZER_H
@@ -16,7 +17,8 @@
 extern "C" {
 #endif
 
-#define CP_DEFAULT_TOK_ROUTES "tok_routes.json"
+/* Same unified file as CP_DEFAULT_ROUTES in arch.h. */
+#define CP_DEFAULT_TOK_ROUTES "config/routes.json"
 
 typedef enum {
     CP_TOK_UNKNOWN = 0,
@@ -26,7 +28,10 @@ typedef enum {
 
 typedef struct cp_tokenizer cp_tokenizer_t;
 
-/* Load / reload strategy routes (class name / model.type -> strategy). */
+/*
+ * Load / reload tokenizer strategy routes from path.
+ * Reads the "tokenizer" object: { "bpe": [...], "unigram": [...] }.
+ */
 int cp_tok_routes_load(const char *path);
 
 const char *cp_tok_strategy_name(cp_tok_strategy_t id);
@@ -36,7 +41,7 @@ void cp_tok_print_routes(FILE *fp);
 cp_tok_strategy_t cp_tok_detect(const char *model_dir);
 
 /*
- * Load tokenizer for model_dir. Auto-loads default tok_routes.json if needed.
+ * Load tokenizer for model_dir. Auto-loads default routes if needed.
  * On success *out is owned by caller (cp_tokenizer_free).
  */
 int cp_tokenizer_load(cp_tokenizer_t **out, const char *model_dir);

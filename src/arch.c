@@ -1,5 +1,5 @@
 /*
- * arch.c - load arch_routes.json and resolve model_type -> strategy
+ * arch.c - load config/routes.json "arch" section; resolve model_type
  */
 
 #include "arch.h"
@@ -132,15 +132,20 @@ int cp_arch_routes_load(const char *path) {
         return -1;
     }
 
-    cJSON *enc = cJSON_GetObjectItemCaseSensitive(root, "encoder-only");
-    cJSON *dec = cJSON_GetObjectItemCaseSensitive(root, "decoder-only");
-    cJSON *ed  = cJSON_GetObjectItemCaseSensitive(root, "encoder-decoder");
+    /* Prefer sectioned { "arch": { ... } }; fall back to flat root. */
+    cJSON *arch = cJSON_GetObjectItemCaseSensitive(root, "arch");
+    cJSON *sec = cJSON_IsObject(arch) ? arch : root;
+
+    cJSON *enc = cJSON_GetObjectItemCaseSensitive(sec, "encoder-only");
+    cJSON *dec = cJSON_GetObjectItemCaseSensitive(sec, "decoder-only");
+    cJSON *ed  = cJSON_GetObjectItemCaseSensitive(sec, "encoder-decoder");
     if (fill_list_from_array(enc, &g_encoder_only) != 0 ||
         fill_list_from_array(dec, &g_decoder_only) != 0 ||
         fill_list_from_array(ed, &g_encoder_decoder) != 0) {
         fprintf(stderr,
-                "cp_arch: '%s' must define encoder-only, decoder-only, "
-                "and encoder-decoder as string arrays\n", path);
+                "cp_arch: '%s' must define arch.encoder-only, "
+                "arch.decoder-only, and arch.encoder-decoder as string arrays\n",
+                path);
         cJSON_Delete(root);
         routes_clear();
         return -1;

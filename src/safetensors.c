@@ -124,7 +124,7 @@ static uint8_t *read_entire_file(const char *path, size_t *out_size)
     *out_size = (size_t)fsz;
     return buf;
 }
-#endif /* _WIN32 */
+#else /* !_WIN32 */
 
 /*
  * Map the whole file read-only (POSIX). Header parsing and tensor
@@ -159,14 +159,23 @@ static uint8_t *map_entire_file(const char *path, size_t *out_size)
     return (uint8_t *)p;
 }
 
+#endif /* _WIN32 */
+
+/* Drop a buffer not yet owned by st_file_t. */
+static void discard_file_buf(uint8_t *buf, size_t size)
+{
+#ifdef _WIN32
+    (void)size;
+    free(buf);
+#else
+    if (buf && size) munmap(buf, size);
+#endif
+}
+
 /* Release the file buffer: munmap on POSIX, free on native Windows. */
 static void release_file_buf(st_file_t *f)
 {
-#ifdef _WIN32
-    free(f->buf);
-#else
-    if (f->buf && f->buf_size) munmap(f->buf, f->buf_size);
-#endif
+    discard_file_buf(f->buf, f->buf_size);
     f->buf = NULL;
     f->buf_size = 0;
 }
@@ -273,7 +282,7 @@ st_file_t *st_load(const char *path)
     if (size < 8)
     {
         fprintf(stderr, "st_load: '%s' too small for a safetensors file\n", path);
-        free(buf);
+        discard_file_buf(buf, size);
         return NULL;
     }
 
@@ -282,7 +291,7 @@ st_file_t *st_load(const char *path)
     {
         fprintf(stderr, "st_load: implausible header length %llu\n",
                 (unsigned long long)hlen);
-        free(buf);
+        discard_file_buf(buf, size);
         return NULL;
     }
 
@@ -290,7 +299,7 @@ st_file_t *st_load(const char *path)
     if (!f)
     {
         fprintf(stderr, "st_load: out of memory\n");
-        free(buf);
+        discard_file_buf(buf, size);
         return NULL;
     }
     f->buf = buf;

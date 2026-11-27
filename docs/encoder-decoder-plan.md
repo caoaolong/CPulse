@@ -20,8 +20,8 @@ translate English to German: How are you?
 **与现有代码的关系**：
 
 - Qwen 的 decoder-only 路径完整保留
-- Enc–Dec 走独立模块；仅当 `cfg->arch == CP_ARCH_ENCODER_DECODER`（由 `arch_routes.json` 路由）时进入
-- 路由配置仍由 `arch_routes.json` 维护；实现能力由代码打开
+- Enc–Dec 走独立模块；仅当 `cfg->arch == CP_ARCH_ENCODER_DECODER`（由 `config/routes.json` 的 `arch` 节路由）时进入
+- 路由配置集中在 `config/routes.json`（`arch` / `tokenizer` 分节）；实现能力由代码打开
 
 ---
 
@@ -59,7 +59,7 @@ src/                  # 共享：main / command / arch / safetensors / view
 src/qwen/             # decoder-only（网络：config/weights/forward/...）
 src/t5/               # encoder-decoder 网络
 src/tok/              # 分词策略（与网络架构解耦）
-  tokenizer.c         # 门面 + tok_routes.json 路由
+  tokenizer.c         # 门面 + config/routes.json 的 tokenizer 节
   bpe.c / unigram.c   # 算法后端
 include/tok|qwen|t5/
 ```
@@ -86,7 +86,7 @@ include/tok|qwen|t5/
 
 - `model_type=t5` 时解析 T5 字段（`d_model`、`d_ff`、`d_kv`、`num_layers`、`num_heads`、`layer_norm_epsilon`、`decoder_start_token_id`、`eos_token_id`、`pad_token_id` 等）
 - 可映射到独立 `cp_t5_config_t`，避免与 Qwen 的 `cp_config_t` 校验缠在一起
-- `arch_routes.json` 仍将 `t5` 归入 `encoder-decoder`
+- `config/routes.json` 的 `arch` 节仍将 `t5` 归入 `encoder-decoder`
 - 打开 encoder-decoder 的实现开关，但只允许进入 T5 专用路径
 
 **验收**：加载 t5-small 不再报 `strategy ... not implemented yet`，而是进入下一阶段（如权重未绑定）的明确错误。
