@@ -13,10 +13,14 @@
 #include "view.h"
 #include "safetensors.h"
 #include "t5/config.h"
+#include "t5/encoder.h"
+#include "t5/generate.h"
 #include "t5/weights.h"
 #include "tok/tokenizer.h"
 #include "bind_recipe.h"
+#include "cJSON.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,6 +70,18 @@ static void on_gen_token(uint32_t id, size_t pos, void *userdata) {
     char piece[64];
     (void)pos;
     if (cp_tokenizer_decode(tok, &id, 1, piece, sizeof piece, 0) >= 0) {
+        printf("%s", piece);
+        fflush(stdout);
+    }
+}
+
+/* T5 streaming: skip special pieces (e.g. </s>) for readable reply. */
+static void on_gen_token_t5(uint32_t id, size_t pos, void *userdata) {
+    cp_tokenizer_t *tok = (cp_tokenizer_t *)userdata;
+    char piece[64];
+    (void)pos;
+    if (cp_tokenizer_decode(tok, &id, 1, piece, sizeof piece,
+                            /*skip_special=*/1) >= 0) {
         printf("%s", piece);
         fflush(stdout);
     }
@@ -374,16 +390,293 @@ static int cmd_summary(const cp_cli_t *cli) {
     return 0;
 }
 
+/*
+ * Compare encoder memory against gold/t5-small.json probe when src ids match.
+ * Returns 0 on match / no comparable gold, -1 on numeric fail, -2 on I/O.
+ */
+static int t5_encoder_check_gold(const float *mem, size_t seq, size_t d_model,
+                                 const uint32_t *ids, size_t n) {
+    const char *path = "gold/t5-small.json";
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        printf("encoder gold: skip (no %s)\n", path);
+        return 0;
+    }
+    fseek(fp, 0, SEEK_END);
+    long sz = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (sz <= 0) {
+        fclose(fp);
+        return -2;
+    }
+    char *buf = malloc((size_t)sz + 1);
+    if (!buf) {
+        fclose(fp);
+        return -2;
+    }
+    if (fread(buf, 1, (size_t)sz, fp) != (size_t)sz) {
+        free(buf);
+        fclose(fp);
+        return -2;
+    }
+    fclose(fp);
+    buf[sz] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root) return -2;
+
+    const cJSON *gids = cJSON_GetObjectItemCaseSensitive(root, "src_token_ids");
+    if (!cJSON_IsArray(gids) || (size_t)cJSON_GetArraySize(gids) != n) {
+        printf("encoder gold: skip (src id length mismatch)\n");
+        cJSON_Delete(root);
+        return 0;
+    }
+    for (size_t i = 0; i < n; i++) {
+        const cJSON *it = cJSON_GetArrayItem(gids, (int)i);
+        if (!cJSON_IsNumber(it) || (uint32_t)it->valuedouble != ids[i]) {
+            printf("encoder gold: skip (src ids differ from gold)\n");
+            cJSON_Delete(root);
+            return 0;
+        }
+    }
+
+    const cJSON *probe =
+            cJSON_GetObjectItemCaseSensitive(root, "encoder_hidden_probe");
+    const cJSON *positions =
+            probe ? cJSON_GetObjectItemCaseSensitive(probe, "positions") : NULL;
+    if (!cJSON_IsArray(positions)) {
+        cJSON_Delete(root);
+        return -2;
+    }
+
+    float max_abs = 0.0f;
+    int n_cmp = 0;
+    const cJSON *pos;
+    cJSON_ArrayForEach(pos, positions) {
+        const cJSON *jp = cJSON_GetObjectItemCaseSensitive(pos, "pos");
+        const cJSON *dims = cJSON_GetObjectItemCaseSensitive(pos, "dims0_7");
+        if (!cJSON_IsNumber(jp) || !cJSON_IsArray(dims)) continue;
+        size_t p = (size_t)jp->valuedouble;
+        if (p >= seq) continue;
+        int nd = cJSON_GetArraySize(dims);
+        if (nd > 8) nd = 8;
+        if ((size_t)nd > d_model) nd = (int)d_model;
+        for (int d = 0; d < nd; d++) {
+            const cJSON *v = cJSON_GetArrayItem(dims, d);
+            if (!cJSON_IsNumber(v)) continue;
+            float got = mem[p * d_model + (size_t)d];
+            float err = fabsf(got - (float)v->valuedouble);
+            if (err > max_abs) max_abs = err;
+            n_cmp++;
+        }
+    }
+    cJSON_Delete(root);
+
+    printf("encoder gold: compared %d values, max_abs_err=%.6g\n", n_cmp,
+           max_abs);
+    /* HF FP32 vs our FP32: expect ~1e-5; allow 1e-3 slack for path diffs */
+    if (n_cmp == 0 || max_abs > 1e-3f) {
+        fprintf(stderr, "encoder gold: FAIL max_abs_err=%.6g\n", max_abs);
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * Load gold greedy.token_ids when src ids match. Returns count, or 0 if N/A.
+ */
+static size_t t5_load_gold_greedy(const uint32_t *src, size_t src_n,
+                                  uint32_t *out, size_t out_cap) {
+    FILE *fp = fopen("gold/t5-small.json", "rb");
+    if (!fp) return 0;
+    fseek(fp, 0, SEEK_END);
+    long sz = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (sz <= 0) {
+        fclose(fp);
+        return 0;
+    }
+    char *buf = malloc((size_t)sz + 1);
+    if (!buf || fread(buf, 1, (size_t)sz, fp) != (size_t)sz) {
+        free(buf);
+        fclose(fp);
+        return 0;
+    }
+    fclose(fp);
+    buf[sz] = '\0';
+
+    size_t n_out = 0;
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root) return 0;
+
+    const cJSON *gids = cJSON_GetObjectItemCaseSensitive(root, "src_token_ids");
+    if (!cJSON_IsArray(gids) ||
+        (size_t)cJSON_GetArraySize(gids) != src_n) {
+        cJSON_Delete(root);
+        return 0;
+    }
+    for (size_t i = 0; i < src_n; i++) {
+        const cJSON *it = cJSON_GetArrayItem(gids, (int)i);
+        if (!cJSON_IsNumber(it) || (uint32_t)it->valuedouble != src[i]) {
+            cJSON_Delete(root);
+            return 0;
+        }
+    }
+    const cJSON *greedy = cJSON_GetObjectItemCaseSensitive(root, "greedy");
+    const cJSON *toks =
+            greedy ? cJSON_GetObjectItemCaseSensitive(greedy, "token_ids")
+                   : NULL;
+    if (cJSON_IsArray(toks)) {
+        int nt = cJSON_GetArraySize(toks);
+        if (nt > (int)out_cap) nt = (int)out_cap;
+        for (int i = 0; i < nt; i++) {
+            const cJSON *it = cJSON_GetArrayItem(toks, i);
+            if (!cJSON_IsNumber(it)) {
+                n_out = 0;
+                break;
+            }
+            out[i] = (uint32_t)it->valuedouble;
+            n_out = (size_t)i + 1;
+        }
+    }
+    cJSON_Delete(root);
+    return n_out;
+}
+
+static int cmd_generate_t5(const cp_cli_t *cli, model_bundle_t *m) {
+    printf("input: %s\n", cli->input_text);
+
+    cp_tokenizer_t *tok = NULL;
+    if (cp_tokenizer_load(&tok, cli->model_dir) != 0) {
+        printf("Result: FAIL - tokenizer loading failed (see stderr).\n");
+        return 6;
+    }
+
+    size_t cap = strlen(cli->input_text) * 4 + 16;
+    uint32_t *ids = malloc(cap * sizeof *ids);
+    if (!ids) {
+        printf("Result: FAIL - out of memory.\n");
+        cp_tokenizer_free(tok);
+        return 6;
+    }
+    int n = cp_tokenizer_encode(tok, cli->input_text, ids, cap, /*add_eos=*/1);
+    if (n < 0) {
+        printf("Result: FAIL - tokenization failed (see stderr).\n");
+        free(ids);
+        cp_tokenizer_free(tok);
+        return 6;
+    }
+    printf("tokens (%d):", n);
+    for (int i = 0; i < n; i++) printf(" %u", ids[i]);
+    printf("\n");
+
+    /* Optional encoder probe (same gold file) before generate. */
+    {
+        cp_t5_encoder_t *enc = NULL;
+        if (cp_t5_encoder_init(&enc, &m->t5_cfg, &m->t5_w, (size_t)n + 8) ==
+            0) {
+            const float *mem = cp_t5_encoder_run(enc, ids, (size_t)n);
+            if (mem) {
+                int eg = t5_encoder_check_gold(mem, (size_t)n,
+                                               m->t5_cfg.d_model, ids,
+                                               (size_t)n);
+                if (eg == -1) {
+                    printf("Result: FAIL - T5 encoder mismatch vs gold.\n");
+                    cp_t5_encoder_free(enc);
+                    free(ids);
+                    cp_tokenizer_free(tok);
+                    return 7;
+                }
+            }
+            cp_t5_encoder_free(enc);
+        }
+    }
+
+    size_t max_new = (size_t)cli->max_new;
+    if (max_new == 0) max_new = 16;
+    cp_t5_session_t *sess = NULL;
+    if (cp_t5_session_init(&sess, &m->t5_cfg, &m->t5_w, (size_t)n + 8,
+                           max_new + 8) != 0) {
+        printf("Result: FAIL - T5 session init failed (see stderr).\n");
+        free(ids);
+        cp_tokenizer_free(tok);
+        return 7;
+    }
+
+    uint32_t *out_ids = malloc(max_new * sizeof *out_ids);
+    if (!out_ids) {
+        printf("Result: FAIL - out of memory.\n");
+        cp_t5_session_free(sess);
+        free(ids);
+        cp_tokenizer_free(tok);
+        return 6;
+    }
+
+    printf("reply: ");
+    int n_gen = cp_t5_generate(sess, ids, (size_t)n, out_ids, max_new,
+                               (int)max_new, on_gen_token_t5, tok);
+    printf("\n");
+    if (n_gen < 0) {
+        printf("Result: FAIL - T5 generate failed (see stderr).\n");
+        free(out_ids);
+        cp_t5_session_free(sess);
+        free(ids);
+        cp_tokenizer_free(tok);
+        return 7;
+    }
+
+    printf("gen tokens (%d):", n_gen);
+    for (int i = 0; i < n_gen; i++) printf(" %u", out_ids[i]);
+    printf("\n");
+
+    uint32_t gold_out[16];
+    size_t n_gold = t5_load_gold_greedy(ids, (size_t)n, gold_out,
+                                        sizeof gold_out / sizeof gold_out[0]);
+    int gold_ok = 1;
+    if (n_gold > 0) {
+        if ((size_t)n_gen != n_gold) {
+            printf("generate gold: FAIL len got %d expect %zu\n", n_gen,
+                   n_gold);
+            gold_ok = 0;
+        } else {
+            for (size_t i = 0; i < n_gold; i++) {
+                if (out_ids[i] != gold_out[i]) {
+                    printf("generate gold: FAIL at %zu got %u expect %u\n", i,
+                           out_ids[i], gold_out[i]);
+                    gold_ok = 0;
+                    break;
+                }
+            }
+            if (gold_ok)
+                printf("generate gold: OK (%zu tokens match HF greedy)\n",
+                       n_gold);
+        }
+    }
+
+    free(out_ids);
+    cp_t5_session_free(sess);
+    free(ids);
+    cp_tokenizer_free(tok);
+
+    if (!gold_ok) {
+        printf("Result: FAIL - T5 greedy mismatch vs gold.\n");
+        return 7;
+    }
+    printf("OK\n");
+    return 0;
+}
+
 static int cmd_generate(const cp_cli_t *cli) {
     model_bundle_t m;
     int rc = load_model(&m, cli);
     if (rc != 0) return rc;
 
     if (m.is_t5) {
-        printf("Result: FAIL - T5 generate not implemented yet "
-               "(weight bind OK; next: ops / encoder / decoder).\n");
+        rc = cmd_generate_t5(cli, &m);
         model_bundle_free(&m);
-        return 7;
+        return rc;
     }
 
     printf("input: %s\n", cli->input_text);

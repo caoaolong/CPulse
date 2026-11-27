@@ -103,6 +103,20 @@ void cp_t5_position_bias(float *bias, const float *rel_emb,
     }
 }
 
+void cp_t5_position_bias_query(float *bias, const float *rel_emb,
+                               size_t q_pos, size_t klen, size_t n_heads,
+                               size_t num_buckets, size_t max_distance,
+                               int bidirectional) {
+    for (size_t ki = 0; ki < klen; ki++) {
+        int rel = (int)ki - (int)q_pos;
+        int bucket = cp_t5_relative_position_bucket(
+                rel, bidirectional, (int)num_buckets, (int)max_distance);
+        const float *row = rel_emb + (size_t)bucket * n_heads;
+        for (size_t h = 0; h < n_heads; h++)
+            bias[h * klen + ki] = row[h];
+    }
+}
+
 static void t5_softmax(float *x, size_t n) {
     float m = x[0];
     for (size_t i = 1; i < n; i++)

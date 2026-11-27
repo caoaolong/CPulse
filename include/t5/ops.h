@@ -66,6 +66,16 @@ void cp_t5_position_bias(float *bias, const float *rel_emb,
                          int bidirectional);
 
 /*
+ * Bias for one absolute query position against keys 0..klen-1.
+ * Output layout: [n_heads, klen] (i.e. qlen=1).
+ * Used by incremental decoder self-attention.
+ */
+void cp_t5_position_bias_query(float *bias, const float *rel_emb,
+                               size_t q_pos, size_t klen, size_t n_heads,
+                               size_t num_buckets, size_t max_distance,
+                               int bidirectional);
+
+/*
  * Multi-head attention core (no QKV/O projections).
  *   q: [seq_q, n_heads, d_kv]
  *   k,v: [seq_k, n_heads, d_kv]
