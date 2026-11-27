@@ -2,7 +2,7 @@
  * generate.c - generation session (see generate.h)
  *
  * Prefill walks the prompt through cp_forward_step; decode repeatedly
- * takes argmax of the latest logits until a stop id or max_new.
+ * samples the latest logits until a stop id or max_new.
  */
 
 #include "qwen/generate.h"
@@ -18,14 +18,6 @@ struct cp_session {
     const cp_config_t  *cfg;
     cp_forward_t       *fw;
 };
-
-static uint32_t argmax(const float *v, uint32_t n) {
-    uint32_t best = 0;
-    for (uint32_t i = 1; i < n; i++) {
-        if (v[i] > v[best]) best = i;
-    }
-    return best;
-}
 
 static int is_stop_id(const cp_config_t *cfg, uint32_t id) {
     return id == cfg->eos_token_id || id == CP_IM_END_ID;
@@ -68,7 +60,7 @@ void cp_session_free(cp_session_t *s) {
 int cp_generate(cp_session_t *s,
                 const uint32_t *prompt, size_t prompt_n,
                 uint32_t *out_ids, size_t out_cap,
-                int max_new,
+                int max_new, const cp_sample_cfg_t *sample,
                 cp_gen_token_fn on_token, void *userdata) {
     if (!s || !s->fw || !s->cfg || !prompt || prompt_n == 0) return -1;
     if (max_new < 0) max_new = 0;
@@ -76,17 +68,24 @@ int cp_generate(cp_session_t *s,
     const cp_config_t *cfg = s->cfg;
     const float *logits = NULL;
 
+    cp_sampler_t *smp = NULL;
+    if (cp_sampler_init(&smp, cfg->vocab_size, sample) != 0) {
+        fprintf(stderr, "cp_generate: sampler init failed\n");
+        return -1;
+    }
+
     for (size_t i = 0; i < prompt_n; i++) {
         logits = cp_forward_step(s->fw, prompt[i], i);
         if (!logits) {
             fprintf(stderr, "cp_generate: prefill failed at pos %zu\n", i);
+            cp_sampler_free(smp);
             return -1;
         }
     }
 
     int n_gen = 0;
     size_t pos = prompt_n;
-    uint32_t next = argmax(logits, cfg->vocab_size);
+    uint32_t next = cp_sampler_next(smp, logits, cfg->vocab_size);
 
     for (int g = 0; g < max_new; g++) {
         if (is_stop_id(cfg, next)) break;
@@ -99,8 +98,9 @@ int cp_generate(cp_session_t *s,
 
         logits = cp_forward_step(s->fw, next, pos++);
         if (!logits) break;
-        next = argmax(logits, cfg->vocab_size);
+        next = cp_sampler_next(smp, logits, cfg->vocab_size);
     }
 
+    cp_sampler_free(smp);
     return n_gen;
 }

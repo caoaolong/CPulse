@@ -1,5 +1,5 @@
 /*
- * t5/generate.c - T5 greedy generate (see t5/generate.h)
+ * t5/generate.c - T5 generate (see t5/generate.h)
  */
 
 #include "t5/generate.h"
@@ -17,14 +17,6 @@ struct cp_t5_session {
     size_t                 max_src;
     size_t                 max_tgt;
 };
-
-static uint32_t argmax(const float *v, uint32_t n) {
-    uint32_t best = 0;
-    for (uint32_t i = 1; i < n; i++) {
-        if (v[i] > v[best]) best = i;
-    }
-    return best;
-}
 
 int cp_t5_session_init(cp_t5_session_t **out, const cp_t5_config_t *cfg,
                        const cp_t5_weights_t *w, size_t max_src,
@@ -66,6 +58,7 @@ void cp_t5_session_free(cp_t5_session_t *s) {
 
 int cp_t5_generate(cp_t5_session_t *s, const uint32_t *src, size_t src_n,
                    uint32_t *out_ids, size_t out_cap, int max_new,
+                   const cp_sample_cfg_t *sample,
                    cp_t5_gen_token_fn on_token, void *userdata) {
     if (!s || !s->enc || !s->dec || !s->cfg || !src || src_n == 0) return -1;
     if (src_n > s->max_src) {
@@ -87,6 +80,12 @@ int cp_t5_generate(cp_t5_session_t *s, const uint32_t *src, size_t src_n,
     }
 
     const cp_t5_config_t *cfg = s->cfg;
+    cp_sampler_t *smp = NULL;
+    if (cp_sampler_init(&smp, cfg->vocab_size, sample) != 0) {
+        fprintf(stderr, "cp_t5_generate: sampler init failed\n");
+        return -1;
+    }
+
     uint32_t tok = cfg->decoder_start_token_id;
     int n_gen = 0;
 
@@ -95,9 +94,10 @@ int cp_t5_generate(cp_t5_session_t *s, const uint32_t *src, size_t src_n,
         const float *logits = cp_t5_decoder_step(s->dec, tok, pos);
         if (!logits) {
             fprintf(stderr, "cp_t5_generate: decode failed at pos %zu\n", pos);
+            cp_sampler_free(smp);
             return -1;
         }
-        uint32_t next = argmax(logits, cfg->vocab_size);
+        uint32_t next = cp_sampler_next(smp, logits, cfg->vocab_size);
 
         if (out_ids && (size_t)n_gen < out_cap)
             out_ids[n_gen] = next;
@@ -110,5 +110,6 @@ int cp_t5_generate(cp_t5_session_t *s, const uint32_t *src, size_t src_n,
         tok = next;
     }
 
+    cp_sampler_free(smp);
     return n_gen;
 }

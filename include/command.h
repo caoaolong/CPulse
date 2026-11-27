@@ -3,12 +3,14 @@
  *
  * main parses argv into cp_cli_t; cp_command_run dispatches:
  *   --token  -> vocab lookup only
- *   --input  -> load model + greedy generate
+ *   --input  -> load model + generate
  *   (default)-> load model + summary / bind check
  */
 
 #ifndef COMMAND_H
 #define COMMAND_H
+
+#include "sample.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +27,7 @@ typedef struct {
     const char *view_path;   /* non-NULL => --view ("" = default path) */
     int         max_new;
     int         use_gpu;
+    cp_sample_cfg_t sample;  /* temperature / top-k / top-p / seed */
 } cp_cli_t;
 
 /* Print CLI usage to stdout. */

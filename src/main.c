@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "command.h"
@@ -29,15 +30,11 @@ static int is_console_redir_token(const char *arg) {
 }
 
 int main(int argc, char **argv) {
-    cp_cli_t cli = {
-        .model_dir   = CP_DEFAULT_MODEL_DIR,
-        .routes_path = NULL,
-        .input_text  = NULL,
-        .token_text  = NULL,
-        .view_path   = NULL,
-        .max_new     = CP_DEFAULT_MAX_NEW,
-        .use_gpu     = 0,
-    };
+    cp_cli_t cli;
+    memset(&cli, 0, sizeof cli);
+    cli.model_dir = CP_DEFAULT_MODEL_DIR;
+    cli.max_new = CP_DEFAULT_MAX_NEW;
+    cp_sample_cfg_default(&cli.sample);
 
     for (int i = 1; i < argc; i++) {
         if (is_console_redir_token(argv[i])) {
@@ -75,6 +72,35 @@ int main(int argc, char **argv) {
             }
             cli.max_new = atoi(argv[++i]);
             if (cli.max_new <= 0) cli.max_new = CP_DEFAULT_MAX_NEW;
+        } else if (strcmp(argv[i], "--temp") == 0 ||
+                   strcmp(argv[i], "--temperature") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for %s\n", argv[i]);
+                cp_cmd_help(argv[0]);
+                return 1;
+            }
+            cli.sample.temperature = (float)atof(argv[++i]);
+        } else if (strcmp(argv[i], "--top-k") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --top-k\n");
+                cp_cmd_help(argv[0]);
+                return 1;
+            }
+            cli.sample.top_k = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--top-p") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --top-p\n");
+                cp_cmd_help(argv[0]);
+                return 1;
+            }
+            cli.sample.top_p = (float)atof(argv[++i]);
+        } else if (strcmp(argv[i], "--seed") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "missing value for --seed\n");
+                cp_cmd_help(argv[0]);
+                return 1;
+            }
+            cli.sample.seed = (uint64_t)strtoull(argv[++i], NULL, 10);
         } else if (strcmp(argv[i], "--gpu") == 0) {
             cli.use_gpu = 1;
         } else if (strcmp(argv[i], "--view") == 0) {

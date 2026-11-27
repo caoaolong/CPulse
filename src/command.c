@@ -244,16 +244,23 @@ static int load_model(model_bundle_t *m, const cp_cli_t *cli) {
 void cp_cmd_help(const char *prog) {
     printf("Usage: %s [--model <model_dir>] [--routes <path>] "
            "[--input <text>] [--token <token>] [--view [out.svg]] "
-           "[--max-new <n>] [--gpu]\n", prog);
+           "[--max-new <n>] [--temp <f>] [--top-k <n>] [--top-p <f>] "
+           "[--seed <u>] [--gpu]\n", prog);
     printf("  --model <model_dir>       path to the model directory\n");
     printf("                            (default: %s)\n", CP_DEFAULT_MODEL_DIR);
     printf("  --routes <path>           unified routes JSON (arch + tokenizer)\n");
     printf("                            (default: %s)\n", CP_DEFAULT_ROUTES);
-    printf("  --input <text>            greedy-generate a continuation of <text>\n");
+    printf("  --input <text>            generate a continuation of <text>\n");
     printf("  --token <token>           print the vocab id of one surface-form token\n");
     printf("  --view [out.svg]          write model-structure SVG "
            "(default: <model_name>.svg)\n");
-    printf("  --max-new <n>             tokens to generate (default %d)\n", CP_DEFAULT_MAX_NEW);
+    printf("  --max-new <n>             tokens to generate (default %d)\n",
+           CP_DEFAULT_MAX_NEW);
+    printf("  --temp / --temperature <f>  sampling temperature "
+           "(default 0 = greedy)\n");
+    printf("  --top-k <n>               keep top-k logits (0 = off, 1 = greedy)\n");
+    printf("  --top-p <f>               nucleus sampling (1 = off)\n");
+    printf("  --seed <u>                RNG seed when not greedy\n");
     printf("  --gpu                     run the forward pass on CUDA (falls back to cpu)\n");
 }
 
@@ -614,9 +621,16 @@ static int cmd_generate_t5(const cp_cli_t *cli, model_bundle_t *m) {
         return 6;
     }
 
+    if (!cp_sample_cfg_is_greedy(&cli->sample)) {
+        printf("sample: temp=%.3g top_k=%d top_p=%.3g seed=%llu\n",
+               cli->sample.temperature, cli->sample.top_k, cli->sample.top_p,
+               (unsigned long long)cli->sample.seed);
+    }
+
     printf("reply: ");
     int n_gen = cp_t5_generate(sess, ids, (size_t)n, out_ids, max_new,
-                               (int)max_new, on_gen_token_t5, tok);
+                               (int)max_new, &cli->sample, on_gen_token_t5,
+                               tok);
     printf("\n");
     if (n_gen < 0) {
         printf("Result: FAIL - T5 generate failed (see stderr).\n");
@@ -635,7 +649,7 @@ static int cmd_generate_t5(const cp_cli_t *cli, model_bundle_t *m) {
     size_t n_gold = t5_load_gold_greedy(ids, (size_t)n, gold_out,
                                         sizeof gold_out / sizeof gold_out[0]);
     int gold_ok = 1;
-    if (n_gold > 0) {
+    if (n_gold > 0 && cp_sample_cfg_is_greedy(&cli->sample)) {
         if ((size_t)n_gen != n_gold) {
             printf("generate gold: FAIL len got %d expect %zu\n", n_gen,
                    n_gold);
@@ -653,6 +667,8 @@ static int cmd_generate_t5(const cp_cli_t *cli, model_bundle_t *m) {
                 printf("generate gold: OK (%zu tokens match HF greedy)\n",
                        n_gold);
         }
+    } else if (n_gold > 0) {
+        printf("generate gold: skip (non-greedy sampling)\n");
     }
 
     free(out_ids);
@@ -751,10 +767,15 @@ static int cmd_generate(const cp_cli_t *cli) {
             printf("forward: %s\n",
                    cp_session_on_gpu(sess) ? "gpu" : "cpu (gpu init failed)");
         }
+        if (!cp_sample_cfg_is_greedy(&cli->sample)) {
+            printf("sample: temp=%.3g top_k=%d top_p=%.3g seed=%llu\n",
+                   cli->sample.temperature, cli->sample.top_k,
+                   cli->sample.top_p,
+                   (unsigned long long)cli->sample.seed);
+        }
         printf("reply: ");
-        int n_gen = cp_generate(sess, ids, (size_t)n,
-                                NULL, 0, cli->max_new,
-                                on_gen_token, tok);
+        int n_gen = cp_generate(sess, ids, (size_t)n, NULL, 0, cli->max_new,
+                                &cli->sample, on_gen_token, tok);
         printf("\n");
         if (n_gen < 0) {
             printf("Result: FAIL - generate failed (see stderr).\n");
